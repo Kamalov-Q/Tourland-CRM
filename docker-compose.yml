@@ -1,0 +1,16 @@
+services: 
+  postgres:
+    image: postgres:16-alpine
+    container_name: tourland-postgres
+    restart: always
+    ports:
+      - "1029:5432"
+    environment:
+        POSTGRES_USER: kamal
+        POSTGRES_PASSWORD: kamalov-tourland
+        POSTGRES_DB: tourland
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
