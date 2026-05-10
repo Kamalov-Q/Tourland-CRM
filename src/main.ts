@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { RedisIoAdapter } from './adapters/redis-io.adapter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -16,6 +17,13 @@ async function bootstrap() {
     }),
   );
 
+  // Redis Socket adapter
+  const redisAdapter = new RedisIoAdapter(app);
+
+  await redisAdapter.connectToRedis();
+
+  app.useWebSocketAdapter(redisAdapter);
+
   const config = new DocumentBuilder()
     .setTitle('CRM API')
     .setDescription('The CRM API description')
@@ -23,7 +31,8 @@ async function bootstrap() {
     .addBearerAuth()
     .build();
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api', app, document);
+  SwaggerModule.setup('docs', app, document);
+
 
   await app.listen(process.env.PORT ?? 3000, () => {
     console.log(`Server is running on port http://localhost:${process.env.PORT ?? 3000}`);

@@ -1,72 +1,212 @@
 import {
-    Body,
     Controller,
-    Get,
-    Param,
-    Patch,
     Post,
+    Patch,
+    Get,
+    Body,
+    Param,
+    Req,
     UseGuards,
 } from '@nestjs/common';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { Roles } from '../../common/decorators/roles.decorator';
-import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../../common/guards/roles.guard';
-import { UserRole } from '../users/entities/user.entity';
-import { CreateTaskDto } from './dto/create-task.dto';
+
+import {
+    ApiTags,
+    ApiOperation,
+    ApiBearerAuth,
+    ApiParam,
+    ApiBody,
+} from '@nestjs/swagger';
+import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { TasksService } from './tasks.service';
+import { CreateTaskTemplateDto } from './dto/create-task-template.dto';
+import { UpdateTaskStatusDto } from './dto/update-task-status.dto';
 import type { AuthenticatedUser } from 'src/common/types/auth-request.type';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 
-
-@ApiTags('tasks')
+@ApiTags('Tasks')
 @ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
+
 @Controller('tasks')
-@UseGuards(JwtAuthGuard, RolesGuard)
-
 export class TasksController {
-    constructor(private readonly tasksService: TasksService) { }
 
-    @Post()
-    @Roles(UserRole.DIRECTOR)
-    @ApiOperation({ summary: 'Create a new task' })
-    @ApiResponse({ status: 201, description: 'Task created successfully.' })
-    @ApiResponse({ status: 403, description: 'Forbidden - Only Directors can create tasks.' })
-    createTask(
-        @CurrentUser() user: AuthenticatedUser,
-        @Body() dto: CreateTaskDto,
+    constructor(
+        private readonly tasksService:
+            TasksService,
+    ) { }
+
+    // CREATE TEMPLATE
+    @Post('template')
+
+    @ApiOperation({
+        summary:
+            'Director creates repetitive task template',
+    })
+
+    @ApiBody({
+        type:
+            CreateTaskTemplateDto,
+    })
+
+    createTemplate(
+
+        @Body()
+        dto:
+            CreateTaskTemplateDto,
+
+        @Req()
+        req: AuthenticatedUser,
     ) {
-        return this.tasksService.createTask(user.id, dto);
+
+        return this.tasksService
+            .createTemplate(
+                dto,
+                req.id,
+            );
     }
 
+    // UPDATE TASK STATUS
+    @Patch(':id/status')
 
-    @Get('director')
-    @Roles(UserRole.DIRECTOR)
-    @ApiOperation({ summary: 'Get tasks created by the current director' })
-    @ApiResponse({ status: 200, description: 'Tasks retrieved successfully.' })
-    getDirectorTasks(@CurrentUser() user: AuthenticatedUser) {
-        return this.tasksService.getTasksForDirector(user.id);
-    }
+    @ApiOperation({
+        summary:
+            'Employee updates task status',
+    })
 
+    @ApiParam({
+        name: 'id',
+        example:
+            'uuid',
+    })
 
-    @Get('employee')
-    @Roles(UserRole.EMPLOYEE)
-    @ApiOperation({ summary: 'Get tasks assigned to the current employee' })
-    @ApiResponse({ status: 200, description: 'Tasks retrieved successfully.' })
-    getEmployeeTasks(@CurrentUser() user: AuthenticatedUser) {
-        return this.tasksService.getTasksForEmployee(user.id);
-    }
+    @ApiBody({
+        type:
+            UpdateTaskStatusDto,
+    })
 
+    updateTaskStatus(
 
-    @Patch(':id/complete')
-    @Roles(UserRole.EMPLOYEE)
-    @ApiOperation({ summary: 'Mark a task as completed' })
-    @ApiResponse({ status: 200, description: 'Task marked as completed.' })
-    @ApiResponse({ status: 404, description: 'Task not found or not assigned to this employee.' })
-    completeTask(
-        @CurrentUser() user: AuthenticatedUser,
-        @Param('id') taskId: string,
+        @Param('id')
+        id: string,
+
+        @Body()
+        dto:
+            UpdateTaskStatusDto,
+
+        @Req()
+        req: AuthenticatedUser,
     ) {
-        return this.tasksService.completeTask(user.id, taskId);
+
+        return this.tasksService
+            .updateTaskStatus(
+                id,
+                dto.status,
+                req.id,
+            );
     }
 
+    // VERIFY TASK
+    @Patch(':id/verify')
+
+    @ApiOperation({
+        summary:
+            'Director verifies employee task',
+    })
+
+    @ApiParam({
+        name: 'id',
+    })
+
+    verifyTask(
+
+        @Param('id')
+        id: string,
+
+        @Req()
+        req: AuthenticatedUser,
+    ) {
+
+        return this.tasksService
+            .verifyTask(
+                id,
+                req.id,
+            );
+    }
+
+    // REJECT TASK
+    @Patch(':id/reject')
+
+    @ApiOperation({
+        summary:
+            'Director rejects employee task',
+    })
+
+    rejectTask(
+
+        @Param('id')
+        id: string,
+
+        @Req()
+        req: AuthenticatedUser,
+    ) {
+
+        return this.tasksService
+            .rejectTask(
+                id,
+                req.id,
+            );
+    }
+
+    // TASK HISTORY
+    @Get(':id/history')
+
+    @ApiOperation({
+        summary:
+            'Get task history timeline',
+    })
+
+    getTaskHistory(
+
+        @Param('id')
+        id: string,
+    ) {
+
+        return this.tasksService
+            .getTaskHistory(id);
+    }
+
+    // EMPLOYEE TASKS
+    @Get('employee/me')
+
+    @ApiOperation({
+        summary:
+            'Employee task dashboard',
+    })
+
+    getEmployeeTasks(
+        @Req() req: AuthenticatedUser,
+    ) {
+
+        return this.tasksService
+            .getEmployeeTasks(
+                req.id,
+            );
+    }
+
+    // DIRECTOR DASHBOARD
+    @Get('director/dashboard')
+
+    @ApiOperation({
+        summary:
+            'Director task dashboard',
+    })
+
+    getDirectorDashboard(
+        @Req() req: AuthenticatedUser,
+    ) {
+
+        return this.tasksService
+            .getDirectorDashboard(
+                req.id,
+            );
+    }
 }

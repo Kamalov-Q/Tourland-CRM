@@ -154,27 +154,66 @@ export class UsersService {
         return this.removePassword(saved);
     }
 
-    async deleteEmployee(
-        directorId: string,
-        employeeId: string
-    ): Promise<{ message: string }> {
-        const employee = await this.userRepo.findOne({
+    // async deleteEmployee(
+    //     directorId: string,
+    //     employeeId: string
+    // ): Promise<{ message: string }> {
+    //     const employee = await this.userRepo.findOne({
+    //         where: {
+    //             id: employeeId,
+    //             role: UserRole.EMPLOYEE,
+    //             parentId: directorId
+    //         }
+    //     });
+
+    //     if (!employee) {
+    //         throw new NotFoundException('Employee not found');
+    //     }
+
+    //     await this.userRepo.remove(employee);
+
+    //     return {
+    //         message: 'Employee deleted successfully'
+    //     }
+    // }
+
+    async deactiveEmployee(
+        userId: string
+    ) {
+        const user = await this.userRepo.findOne({
             where: {
-                id: employeeId,
-                role: UserRole.EMPLOYEE,
-                parentId: directorId
-            }
+                id: userId
+            },
         });
 
-        if (!employee) {
-            throw new NotFoundException('Employee not found');
+        if (!user) {
+            throw new BadRequestException('User not found');
         }
 
-        await this.userRepo.remove(employee);
-
-        return {
-            message: 'Employee deleted successfully'
+        if (user.role === UserRole.DIRECTOR) {
+            throw new BadRequestException('Director cannot be deleted');
         }
+
+        user.isActive = false;
+
+        return this.userRepo.save(user);
+    }
+
+    async activateEmployee(userId: string) {
+        const user = await this.userRepo.findOne({
+            where: {
+                id: userId,
+            },
+        });
+
+        if (!user) {
+            throw new NotFoundException('User not found');
+        }
+
+        user.isActive = true;
+
+        return this.userRepo.save(user);
+
     }
 
     async updateDirectorProfile(

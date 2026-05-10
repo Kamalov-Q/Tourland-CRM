@@ -7,7 +7,7 @@ import type { AuthenticatedUser } from "src/common/types/auth-request.type";
 import { Roles } from "src/common/decorators/roles.decorator";
 import { UserRole } from "./entities/user.entity";
 import { CreateEmployeeDto } from "./dto/create-employee.dto";
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
+import { ApiBearerAuth, ApiBody, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { UpdateDirectorProfileDto } from "./dto/update-director-profile.dto";
 import { ChangePasswordDto } from "./dto/change-password.dto";
 import { UpdateEmployeeDto } from "./dto/update-employee.dto";
@@ -30,6 +30,8 @@ export class UsersController {
 
     @Patch('director/profile')
     @Roles(UserRole.DIRECTOR)
+    @ApiOperation({ summary: 'Update director profile' })
+    @ApiBody({ type: UpdateDirectorProfileDto })
     updateDirectorProfile(
         @CurrentUser() user: AuthenticatedUser,
         @Body() dto: UpdateDirectorProfileDto,
@@ -39,6 +41,8 @@ export class UsersController {
 
     @Patch('director/change-password')
     @Roles(UserRole.DIRECTOR)
+    @ApiOperation({ summary: 'Change profile password' })
+    @ApiBody({ type: ChangePasswordDto })
     changeDirectorPassword(
         @CurrentUser() user: AuthenticatedUser,
         @Body() dto: ChangePasswordDto

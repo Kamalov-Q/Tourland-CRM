@@ -6,6 +6,8 @@ import { TasksModule } from './modules/tasks/tasks.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { DepartmentsModule } from './modules/departments/departments.module';
 import { ClientsModule } from './modules/clients/clients.module';
+import { BullModule } from '@nestjs/bullmq';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [ConfigModule.forRoot({
@@ -25,11 +27,20 @@ import { ClientsModule } from './modules/clients/clients.module';
       synchronize: true
     })
   }),
+  BullModule.forRoot({
+    connection: {
+      host: 'localhost',
+      port: 6379
+    }
+  }),
+
+  // Cron
+  ScheduleModule.forRoot(),
     AuthModule,
     UsersModule,
     TasksModule,
     DepartmentsModule,
-    ClientsModule
+    ClientsModule,
   ],
   controllers: [],
   providers: [],
