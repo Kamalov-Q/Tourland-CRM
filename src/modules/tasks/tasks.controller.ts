@@ -5,9 +5,9 @@ import {
     Get,
     Body,
     Param,
-    Req,
     UseGuards,
 } from '@nestjs/common';
+import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 
 import {
     ApiTags,
@@ -21,10 +21,13 @@ import { TasksService } from './tasks.service';
 import { CreateTaskTemplateDto } from './dto/create-task-template.dto';
 import { UpdateTaskStatusDto } from './dto/update-task-status.dto';
 import type { AuthenticatedUser } from 'src/common/types/auth-request.type';
+import { Roles } from 'src/common/decorators/roles.decorator';
+import { UserRole } from 'src/modules/users/entities/user.entity';
+import { RolesGuard } from 'src/common/guards/roles.guard';
 
 @ApiTags('Tasks')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 
 @Controller('tasks')
 export class TasksController {
@@ -36,6 +39,7 @@ export class TasksController {
 
     // CREATE TEMPLATE
     @Post('template')
+    @Roles(UserRole.DIRECTOR)
 
     @ApiOperation({
         summary:
@@ -53,7 +57,7 @@ export class TasksController {
         dto:
             CreateTaskTemplateDto,
 
-        @Req()
+        @CurrentUser()
         req: AuthenticatedUser,
     ) {
 
@@ -92,7 +96,7 @@ export class TasksController {
         dto:
             UpdateTaskStatusDto,
 
-        @Req()
+        @CurrentUser()
         req: AuthenticatedUser,
     ) {
 
@@ -106,6 +110,7 @@ export class TasksController {
 
     // VERIFY TASK
     @Patch(':id/verify')
+    @Roles(UserRole.DIRECTOR)
 
     @ApiOperation({
         summary:
@@ -121,7 +126,7 @@ export class TasksController {
         @Param('id')
         id: string,
 
-        @Req()
+        @CurrentUser()
         req: AuthenticatedUser,
     ) {
 
@@ -134,6 +139,7 @@ export class TasksController {
 
     // REJECT TASK
     @Patch(':id/reject')
+    @Roles(UserRole.DIRECTOR)
 
     @ApiOperation({
         summary:
@@ -145,7 +151,7 @@ export class TasksController {
         @Param('id')
         id: string,
 
-        @Req()
+        @CurrentUser()
         req: AuthenticatedUser,
     ) {
 
@@ -183,7 +189,7 @@ export class TasksController {
     })
 
     getEmployeeTasks(
-        @Req() req: AuthenticatedUser,
+        @CurrentUser() req: AuthenticatedUser,
     ) {
 
         return this.tasksService
@@ -194,6 +200,7 @@ export class TasksController {
 
     // DIRECTOR DASHBOARD
     @Get('director/dashboard')
+    @Roles(UserRole.DIRECTOR)
 
     @ApiOperation({
         summary:
@@ -201,7 +208,7 @@ export class TasksController {
     })
 
     getDirectorDashboard(
-        @Req() req: AuthenticatedUser,
+        @CurrentUser() req: AuthenticatedUser,
     ) {
 
         return this.tasksService

@@ -4,10 +4,10 @@ import { User, UserRole } from "./entities/user.entity";
 import { Repository } from "typeorm";
 import { CreateEmployeeDto } from "./dto/create-employee.dto";
 import * as bcrypt from 'bcrypt';
-import { UpdateDirectorProfileDto } from "./dto/update-director-profile.dto";
 import { SafeUser } from "./types/safe-user.type";
 import { ChangePasswordDto } from "./dto/change-password.dto";
 import { UpdateEmployeeDto } from "./dto/update-employee.dto";
+import { UpdateProfileDto } from "./dto/update-profile.dto";
 
 @Injectable()
 export class UsersService {
@@ -73,12 +73,17 @@ export class UsersService {
         return safeUser;
     }
 
-    getMyEmployees(directorId: string): Promise<User[]> {
+    async getMyEmployees(userId: string): Promise<User[]> {
+        const user = await this.userRepo.findOne({ where: { id: userId } });
+        if (!user) throw new NotFoundException('User not found');
+
+        const directorId = user.role === UserRole.DIRECTOR ? user.id : user.parentId;
+        if (!directorId) throw new BadRequestException('Director ID not found');
+
         return this.userRepo.find({
             where: {
                 parentId: directorId,
                 role: UserRole.EMPLOYEE,
-                isActive: true
             },
             order: {
                 createdAt: 'DESC'
@@ -154,30 +159,7 @@ export class UsersService {
         return this.removePassword(saved);
     }
 
-    // async deleteEmployee(
-    //     directorId: string,
-    //     employeeId: string
-    // ): Promise<{ message: string }> {
-    //     const employee = await this.userRepo.findOne({
-    //         where: {
-    //             id: employeeId,
-    //             role: UserRole.EMPLOYEE,
-    //             parentId: directorId
-    //         }
-    //     });
-
-    //     if (!employee) {
-    //         throw new NotFoundException('Employee not found');
-    //     }
-
-    //     await this.userRepo.remove(employee);
-
-    //     return {
-    //         message: 'Employee deleted successfully'
-    //     }
-    // }
-
-    async deactiveEmployee(
+    async deactivateEmployee(
         userId: string
     ) {
         const user = await this.userRepo.findOne({
@@ -216,23 +198,22 @@ export class UsersService {
 
     }
 
-    async updateDirectorProfile(
-        directorId: string,
-        dto: UpdateDirectorProfileDto
+    async updateProfile(
+        userId: string,
+        dto: UpdateProfileDto
     ): Promise<SafeUser> {
-        const director = await this.userRepo.findOne({
+        const user = await this.userRepo.findOne({
             where: {
-                id: directorId,
-                role: UserRole.DIRECTOR,
+                id: userId,
                 isActive: true
             }
         });
 
-        if (!director) {
-            throw new ForbiddenException('Only director can update profile');
+        if (!user) {
+            throw new NotFoundException('User not found');
         }
 
-        if (dto.phoneNumber && dto.phoneNumber !== director.phoneNumber) {
+        if (dto.phoneNumber && dto.phoneNumber !== user.phoneNumber) {
             const exists = await this.userRepo.findOne({
                 where: {
                     phoneNumber: dto.phoneNumber
@@ -243,20 +224,19 @@ export class UsersService {
                 throw new ConflictException('Phone number already exists');
             }
 
-            director.phoneNumber = dto.phoneNumber;
+            user.phoneNumber = dto.phoneNumber;
         }
 
         if (dto.firstName !== undefined) {
-            director.firstName = dto.firstName;
+            user.firstName = dto.firstName;
         }
 
         if (dto.lastName !== undefined) {
-            director.lastName = dto.lastName;
+            user.lastName = dto.lastName;
         }
 
-        const saved = await this.userRepo.save(director);
+        const saved = await this.userRepo.save(user);
         return this.removePassword(saved);
-
     }
 
     async changeDirectorPassword(

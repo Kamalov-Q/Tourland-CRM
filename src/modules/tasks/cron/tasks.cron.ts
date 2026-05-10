@@ -26,12 +26,19 @@ export class TasksCron {
         const now = new Date();
 
         const currentTime = now.toTimeString().slice(0, 5);
+
+        const todayStart = new Date(now);
+        todayStart.setHours(0, 0, 0, 0);
+
+        const todayEnd = new Date(now);
+        todayEnd.setHours(23, 59, 59, 999);
+
         // Only active templates
         const templates = await this.templateRepo.find({
             where: {
                 isActive: true,
-                startDate: LessThanOrEqual(now),
-                endDate: MoreThanOrEqual(now)
+                startDate: LessThanOrEqual(todayEnd),
+                endDate: MoreThanOrEqual(todayStart)
             }
         });
 

@@ -10,14 +10,19 @@ import { BullModule } from '@nestjs/bullmq';
 import { TasksProcessor } from './processors/task.processor';
 import { TasksCron } from './cron/tasks.cron';
 import { NotificationGateway } from './gateways/notification.gateway';
+import { UsersModule } from '../users/users.module';
+import { User } from '../users/entities/user.entity';
+import { forwardRef } from '@nestjs/common';
 
 @Module({
     imports: [TypeOrmModule.forFeature([
         TaskTemplate,
         TaskInstance,
         TaskStatusHistory,
-        Notification
+        Notification,
+        User
     ]),
+    forwardRef(() => UsersModule),
     // Redis Queue
     BullModule.registerQueue({
         name: 'task-queue',

@@ -8,6 +8,9 @@ import { DepartmentsModule } from './modules/departments/departments.module';
 import { ClientsModule } from './modules/clients/clients.module';
 import { BullModule } from '@nestjs/bullmq';
 import { ScheduleModule } from '@nestjs/schedule';
+import { ServeStaticModule } from '@nestjs/serve-static';
+import { join } from 'path';
+import { AttendanceModule } from './modules/attendance/attendance.module';
 
 @Module({
   imports: [ConfigModule.forRoot({
@@ -41,6 +44,11 @@ import { ScheduleModule } from '@nestjs/schedule';
     TasksModule,
     DepartmentsModule,
     ClientsModule,
+    AttendanceModule,
+    ServeStaticModule.forRoot({
+      rootPath: join(process.cwd(), 'uploads'),
+      serveRoot: '/uploads',
+    }),
   ],
   controllers: [],
   providers: [],

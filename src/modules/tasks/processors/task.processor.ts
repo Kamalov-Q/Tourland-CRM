@@ -52,21 +52,19 @@ export class TasksProcessor extends WorkerHost {
 
         if (!employee?.isActive) return;
 
-        const now = new Date();
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
 
-        // Validating range
-        if (now < template.startDate || now > template.endDate) {
+        const startDay = new Date(template.startDate);
+        startDay.setHours(0, 0, 0, 0);
+
+        const endDay = new Date(template.endDate);
+        endDay.setHours(23, 59, 59, 999);
+
+        if (today < startDay || today > endDay) {
             return;
         }
 
-        const today = new Date();
-
-        today.setHours(
-            0,
-            0,
-            0,
-            0
-        );
 
         // Preventing duplications
         const existing = await this.taskRepo.findOne({

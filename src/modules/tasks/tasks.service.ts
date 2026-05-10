@@ -10,6 +10,8 @@ import { CreateTaskTemplateDto } from "./dto/create-task-template.dto";
 import { TaskStatus } from "./enums/task-status.enum";
 import { NotificationType } from "./enums/notification-type.enum";
 import { User } from "../users/entities/user.entity";
+import { InjectQueue } from "@nestjs/bullmq";
+import { Queue } from "bullmq";
 
 @Injectable()
 export class TasksService {
@@ -32,7 +34,10 @@ export class TasksService {
 
         private gateway: NotificationGateway,
 
-        private dataSource: DataSource
+        private dataSource: DataSource,
+
+        @InjectQueue('task-queue')
+        private readonly taskQueue: Queue
     ) { }
 
     // Create Template
@@ -75,7 +80,23 @@ export class TasksService {
             endDate: dto.endDate
         });
 
-        return this.templateRepo.save(template);
+        const saved = await this.templateRepo.save(template);
+
+        const todayDate = new Date();
+        const startDay = new Date(start);
+        startDay.setHours(0, 0, 0, 0);
+        const endDay = new Date(end);
+        endDay.setHours(23, 59, 59, 999);
+
+        if (todayDate >= startDay && todayDate <= endDay) {
+            await this.taskQueue.add(
+                'generate-task',
+                { templateId: saved.id },
+                { attempts: 3 }
+            );
+        }
+
+        return saved;
     }
 
     // Update task status
