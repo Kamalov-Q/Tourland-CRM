@@ -2,7 +2,7 @@ import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, PrimaryGenerat
 import { TaskInstance } from "./task-instance.entity";
 import { TaskStatus } from "../enums/task-status.enum";
 
-Entity('task_status_history')
+@Entity('task_status_history')
 export class TaskStatusHistory {
 
     @PrimaryGeneratedColumn('uuid')

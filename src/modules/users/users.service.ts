@@ -8,11 +8,16 @@ import { SafeUser } from "./types/safe-user.type";
 import { ChangePasswordDto } from "./dto/change-password.dto";
 import { UpdateEmployeeDto } from "./dto/update-employee.dto";
 import { UpdateProfileDto } from "./dto/update-profile.dto";
+import { ActivityLog } from "../archive/entities/activity-log.entity";
 
 @Injectable()
 export class UsersService {
-    constructor(@InjectRepository(User)
-    private readonly userRepo: Repository<User>) { }
+    constructor(
+        @InjectRepository(User)
+        private readonly userRepo: Repository<User>,
+        @InjectRepository(ActivityLog)
+        private readonly activityRepo: Repository<ActivityLog>
+    ) { }
 
     private removePassword(user: User): SafeUser {
         const { password: _password, ...safeuser } = user;
@@ -236,6 +241,16 @@ export class UsersService {
         }
 
         const saved = await this.userRepo.save(user);
+
+        // log activity
+        await this.activityRepo.save({
+            userId: saved.id,
+            actionType: 'PROFILE_UPDATED',
+            details: {
+                message: 'Profil malumotlari yangilandi'
+            }
+        });
+
         return this.removePassword(saved);
     }
 

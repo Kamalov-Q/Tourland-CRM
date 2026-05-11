@@ -14,13 +14,16 @@ import { UsersModule } from '../users/users.module';
 import { User } from '../users/entities/user.entity';
 import { forwardRef } from '@nestjs/common';
 
+import { ActivityLog } from '../archive/entities/activity-log.entity';
+
 @Module({
     imports: [TypeOrmModule.forFeature([
         TaskTemplate,
         TaskInstance,
         TaskStatusHistory,
         Notification,
-        User
+        User,
+        ActivityLog
     ]),
     forwardRef(() => UsersModule),
     // Redis Queue

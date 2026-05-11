@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { TaskTemplate } from "../entities/task-template.entity";
-import { LessThanOrEqual, MoreThanOrEqual, Not, Repository } from "typeorm";
+import { LessThanOrEqual, MoreThanOrEqual, In, Repository } from "typeorm";
 import { TaskInstance } from "../entities/task-instance.entity";
 import { InjectQueue } from "@nestjs/bullmq";
 import { Queue } from "bullmq";
@@ -50,7 +50,8 @@ export class TasksCron {
             await this.taskQueue.add(
                 'generate-task',
                 {
-                    templateId: template.id
+                    templateId: template.id,
+                    isCron: true
                 },
                 {
                     attempts: 3,
@@ -80,7 +81,7 @@ export class TasksCron {
         const tasks = await this.taskRepo.find({
             where: {
                 dueDate: today,
-                status: Not(TaskStatus.DONE)
+                status: In([TaskStatus.TODO, TaskStatus.IN_PROGRESS, TaskStatus.PENDING])
             }
         });
 

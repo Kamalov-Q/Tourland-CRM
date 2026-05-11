@@ -11,6 +11,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
 import { AttendanceModule } from './modules/attendance/attendance.module';
+import { ArchiveModule } from './modules/archive/archive.module';
 
 @Module({
   imports: [ConfigModule.forRoot({
@@ -45,6 +46,7 @@ import { AttendanceModule } from './modules/attendance/attendance.module';
     DepartmentsModule,
     ClientsModule,
     AttendanceModule,
+    ArchiveModule,
     ServeStaticModule.forRoot({
       rootPath: join(process.cwd(), 'uploads'),
       serveRoot: '/uploads',

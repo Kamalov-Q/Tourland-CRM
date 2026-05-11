@@ -9,7 +9,8 @@ import { NotificationGateway } from "./gateways/notification.gateway";
 import { CreateTaskTemplateDto } from "./dto/create-task-template.dto";
 import { TaskStatus } from "./enums/task-status.enum";
 import { NotificationType } from "./enums/notification-type.enum";
-import { User } from "../users/entities/user.entity";
+import { User, UserRole } from "../users/entities/user.entity";
+import { ActivityLog } from "../archive/entities/activity-log.entity";
 import { InjectQueue } from "@nestjs/bullmq";
 import { Queue } from "bullmq";
 
@@ -31,6 +32,9 @@ export class TasksService {
 
         @InjectRepository(Notification)
         private readonly notificationRepo: Repository<Notification>,
+        
+        @InjectRepository(ActivityLog)
+        private readonly activityRepo: Repository<ActivityLog>,
 
         private gateway: NotificationGateway,
 
@@ -91,7 +95,7 @@ export class TasksService {
         if (todayDate >= startDay && todayDate <= endDay) {
             await this.taskQueue.add(
                 'generate-task',
-                { templateId: saved.id },
+                { templateId: saved.id, isCron: false },
                 { attempts: 3 }
             );
         }
@@ -139,6 +143,12 @@ export class TasksService {
                     throw new BadRequestException('Director verification required');
                 }
 
+                if (user.role === UserRole.EMPLOYEE) {
+                    if (newStatus !== TaskStatus.IN_PROGRESS && newStatus !== TaskStatus.PENDING) {
+                        throw new BadRequestException('Employee can only set task to in_progress or pending');
+                    }
+                }
+
                 // Must start first
                 if (newStatus === TaskStatus.PENDING) {
                     if (task.status !== TaskStatus.IN_PROGRESS) {
@@ -160,15 +170,27 @@ export class TasksService {
 
                 await manager.save(history);
 
-                // Notification
+                await manager.save(ActivityLog, {
+                    userId,
+                    actionType: 'TASK_STATUS_CHANGED',
+                    details: {
+                        taskId: task.id,
+                        title: task.template?.title,
+                        oldStatus,
+                        newStatus
+                    }
+                });
+
+                // Notification & Socket
+                const notifyUserId = userId === task.assignedTo ? task.template.createdBy : task.assignedTo;
+
                 await manager.save(Notification, {
-                    userId: task.template.createdBy,
+                    userId: notifyUserId,
                     type: NotificationType.TASK_STATUS_CHANGED,
                     message: `Task status changed to ${newStatus}`
                 });
 
-                // Socket event
-                this.gateway.emitTaskStatusChanged(task.template.createdBy, {
+                this.gateway.emitTaskStatusChanged(notifyUserId, {
                     taskId: task.id,
                     oldStatus,
                     newStatus,
@@ -226,6 +248,16 @@ export class TasksService {
 
             await manager.save(history);
 
+            await manager.save(ActivityLog, {
+                userId: directorId,
+                actionType: 'TASK_VERIFIED',
+                details: {
+                    taskId: task.id,
+                    title: task.template?.title,
+                    status: TaskStatus.DONE
+                }
+            });
+
             // Notification
             await manager.save(Notification, {
                 userId: task.assignedTo,
@@ -280,6 +312,16 @@ export class TasksService {
 
             await manager.save(history);
 
+            await manager.save(ActivityLog, {
+                userId: directorId,
+                actionType: 'TASK_REJECTED',
+                details: {
+                    taskId: task.id,
+                    title: task.template?.title,
+                    status: TaskStatus.REJECTED
+                }
+            });
+
             // NOtification
             await manager.save(Notification, {
                 userId: task.assignedTo,
@@ -311,7 +353,7 @@ export class TasksService {
 
     // Employee Tasks
     async getEmployeeTasks(employeeId: string) {
-        return this.taskRepo.find({
+        const tasks = await this.taskRepo.find({
             where: {
                 assignedTo: employeeId
             },
@@ -319,6 +361,22 @@ export class TasksService {
             order: {
                 dueDate: 'DESC'
             }
+        });
+
+        const now = new Date();
+        const currentTime = now.toTimeString().slice(0, 5);
+        const todayD = new Date();
+        todayD.setHours(0,0,0,0);
+
+        return tasks.filter(t => {
+            const taskD = new Date(t.dueDate);
+            taskD.setHours(0,0,0,0);
+            if (taskD.getTime() === todayD.getTime()) {
+                if (t.template?.notifyAt && t.template.notifyAt > currentTime) {
+                    return false;
+                }
+            }
+            return true;
         });
     }
 
