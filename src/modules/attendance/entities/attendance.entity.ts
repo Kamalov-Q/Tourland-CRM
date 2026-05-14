@@ -7,11 +7,11 @@ export class Attendance {
     id: string;
 
     @Column({ type: 'uuid' })
-    userId: string;
+    employeeId: string;
 
     @ManyToOne(() => User)
-    @JoinColumn({ name: 'userId' })
-    user: User;
+    @JoinColumn({ name: 'employeeId' })
+    employee: User;
 
     @Column({ type: 'date' })
     date: string; // YYYY-MM-DD
@@ -23,7 +23,7 @@ export class Attendance {
     checkOutAt: Date | null;
 
     @Column({ type: 'text', nullable: true })
-    checkInPhoto: string | null;
+    photo: string | null;
 
     @Column({ type: 'text', nullable: true })
     checkOutPhoto: string | null;

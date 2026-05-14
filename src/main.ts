@@ -1,8 +1,9 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { ValidationPipe } from '@nestjs/common';
+import { Logger, ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { RedisIoAdapter } from './adapters/redis-io.adapter';
+import { ConfigService } from '@nestjs/config';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -20,11 +21,10 @@ async function bootstrap() {
     }),
   );
 
-  // Redis Socket adapter
+  // Redis Socket adapter (using env vars via ConfigService)
+  const configSvc = app.get(ConfigService);
   const redisAdapter = new RedisIoAdapter(app);
-
-  await redisAdapter.connectToRedis();
-
+  await redisAdapter.connectToRedis(configSvc);
   app.useWebSocketAdapter(redisAdapter);
 
   const config = new DocumentBuilder()
@@ -37,9 +37,10 @@ async function bootstrap() {
   SwaggerModule.setup('docs', app, document);
 
 
+  const logger = new Logger('Bootstrap');
   await app.listen(process.env.PORT ?? 3000, () => {
-    console.log(`Server is running on port http://localhost:${process.env.PORT ?? 3000}`);
-    console.log(`Swagger UI is running on port http://localhost:${process.env.PORT ?? 3000}/docs`);
+    logger.log(`Server is running on port http://localhost:${process.env.PORT ?? 3000}`);
+    logger.log(`Swagger UI is running on port http://localhost:${process.env.PORT ?? 3000}/docs`);
   });
 }
 bootstrap();

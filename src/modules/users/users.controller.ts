@@ -13,7 +13,7 @@ import { UpdateEmployeeDto } from "./dto/update-employee.dto";
 import { UpdateProfileDto } from "./dto/update-profile.dto";
 
 
-@ApiTags('users')
+@ApiTags('Users')
 @ApiBearerAuth()
 @Controller('users')
 @UseGuards(JwtAuthGuard, RolesGuard)

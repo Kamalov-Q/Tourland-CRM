@@ -1,42 +1,35 @@
 import { IoAdapter } from "@nestjs/platform-socket.io";
 import { createAdapter } from "@socket.io/redis-adapter";
 import { createClient, RedisClientType } from "redis";
-import { INestApplicationContext } from '@nestjs/common';
+import { INestApplicationContext, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { ServerOptions } from "socket.io";
 
 export class RedisIoAdapter extends IoAdapter {
 
     private adapterConstructor: ReturnType<typeof createAdapter>;
-
     private pubClient: RedisClientType;
-
     private subClient: RedisClientType;
+    private readonly logger = new Logger(RedisIoAdapter.name);
 
-    constructor(
-        app: INestApplicationContext
-    ) {
+    constructor(app: INestApplicationContext) {
         super(app);
     }
 
-    async connectToRedis() {
+    async connectToRedis(configSvc: ConfigService) {
+        const redisHost = configSvc.get<string>('REDIS_HOST', 'localhost');
+        const redisPort = configSvc.get<number>('REDIS_PORT', 6379);
+        const redisUrl = `redis://${redisHost}:${redisPort}`;
 
-        //publisher
-        this.pubClient = createClient({
-            url: 'redis://localhost:6379'
-        });
+        this.pubClient = createClient({ url: redisUrl }) as RedisClientType;
+        this.subClient = this.pubClient.duplicate() as RedisClientType;
 
-        //subscriber 
-        this.subClient = this.pubClient.duplicate();
-
-        //connect
         await this.pubClient.connect();
-
         await this.subClient.connect();
 
-        //socket adapter
         this.adapterConstructor = createAdapter(this.pubClient, this.subClient);
 
-        console.log(`Redis Socket Adapter connected`);
+        this.logger.log(`Redis Socket Adapter connected to ${redisUrl}`);
     }
 
     createIOServer(port: number, options?: ServerOptions) {
@@ -48,13 +41,8 @@ export class RedisIoAdapter extends IoAdapter {
             }
         });
 
-        // using redis adapter
-        server.adapter(
-            this.adapterConstructor,
-        );
+        server.adapter(this.adapterConstructor);
 
         return server;
     }
-
-
 }

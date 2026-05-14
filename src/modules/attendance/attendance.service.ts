@@ -1,78 +1,76 @@
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Attendance } from "./entities/attendance.entity";
 import { Repository } from "typeorm";
 import { CheckInDto } from "./dto/check-in.dto";
 import { CheckOutDto } from "./dto/check-out.dto";
-import * as fs from 'fs';
+import * as fs from 'fs/promises';
+import * as fsSync from 'fs';
 import * as path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
 export class AttendanceService {
     private readonly uploadPath = path.join(process.cwd(), 'uploads', 'attendance');
+    private readonly logger = new Logger(AttendanceService.name);
 
     constructor(
         @InjectRepository(Attendance)
         private readonly attendanceRepo: Repository<Attendance>
     ) {
-        if (!fs.existsSync(this.uploadPath)) {
-            fs.mkdirSync(this.uploadPath, { recursive: true });
+        // Ensure upload directory exists (sync is fine once at startup)
+        if (!fsSync.existsSync(this.uploadPath)) {
+            fsSync.mkdirSync(this.uploadPath, { recursive: true });
+            this.logger.log(`Created attendance upload directory at ${this.uploadPath}`);
         }
     }
 
-    private savePhoto(base64: string): string {
+    private async savePhoto(base64: string): Promise<string> {
+        const matches = base64.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+        if (!matches || matches.length !== 3) {
+            throw new BadRequestException('Invalid photo format — expected base64 data URI');
+        }
+
+        const buffer = Buffer.from(matches[2], 'base64');
+        const fileName = `${uuidv4()}.jpg`;
+        const filePath = path.join(this.uploadPath, fileName);
+
         try {
-            const matches = base64.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
-            if (!matches || matches.length !== 3) {
-                throw new Error('Invalid base64 string');
-            }
-
-            const buffer = Buffer.from(matches[2], 'base64');
-            const fileName = `${uuidv4()}.jpg`;
-            const filePath = path.join(this.uploadPath, fileName);
-            fs.writeFileSync(filePath, buffer);
-
-            return `/uploads/attendance/${fileName}`;
-        } catch (error) {
+            await fs.writeFile(filePath, buffer);
+        } catch {
             throw new BadRequestException('Failed to save photo');
         }
+
+        return `/uploads/attendance/${fileName}`;
     }
 
     private getTodayStr(): string {
-        const d = new Date();
-        const m = String(d.getMonth() + 1).padStart(2, "0");
-        const day = String(d.getDate()).padStart(2, "0");
-        return `${d.getFullYear()}-${m}-${day}`;
+        return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tashkent' });
     }
 
-    async checkIn(userId: string, dto: CheckInDto) {
+    async checkIn(employeeId: string, dto: CheckInDto) {
         const date = this.getTodayStr();
-        const exists = await this.attendanceRepo.findOne({
-            where: { userId, date }
-        });
+        const exists = await this.attendanceRepo.findOne({ where: { employeeId, date } });
 
         if (exists) {
             throw new BadRequestException('Already checked in today');
         }
 
-        const photoUrl = this.savePhoto(dto.photo);
+        const photoUrl = await this.savePhoto(dto.photo);
 
         const attendance = this.attendanceRepo.create({
-            userId,
+            employeeId,
             date,
             checkInAt: new Date(),
-            checkInPhoto: photoUrl
+            photo: photoUrl
         });
 
         return this.attendanceRepo.save(attendance);
     }
 
-    async checkOut(userId: string, dto: CheckOutDto) {
+    async checkOut(employeeId: string, dto: CheckOutDto) {
         const date = this.getTodayStr();
-        const attendance = await this.attendanceRepo.findOne({
-            where: { userId, date }
-        });
+        const attendance = await this.attendanceRepo.findOne({ where: { employeeId, date } });
 
         if (!attendance) {
             throw new BadRequestException('Must check in before checking out');
@@ -82,7 +80,7 @@ export class AttendanceService {
             throw new BadRequestException('Already checked out today');
         }
 
-        const photoUrl = this.savePhoto(dto.photo);
+        const photoUrl = await this.savePhoto(dto.photo);
 
         attendance.checkOutAt = new Date();
         attendance.checkOutPhoto = photoUrl;
@@ -90,24 +88,22 @@ export class AttendanceService {
         return this.attendanceRepo.save(attendance);
     }
 
-    async getMyHistory(userId: string) {
+    find(query: { employeeId?: string; date?: string }) {
         return this.attendanceRepo.find({
-            where: { userId },
-            order: { date: 'DESC' }
+            where: {
+                ...(query.employeeId && { employeeId: query.employeeId }),
+                ...(query.date && { date: query.date }),
+            },
+            order: { date: 'DESC', checkInAt: 'DESC' },
+            relations: ['employee']
         });
     }
 
-    async getEmployeeHistory(employeeId: string) {
+    /** Employee's own history */
+    getHistory(employeeId: string) {
         return this.attendanceRepo.find({
-            where: { userId: employeeId },
+            where: { employeeId },
             order: { date: 'DESC' }
-        });
-    }
-
-    async getAllAttendance() {
-        return this.attendanceRepo.find({
-            relations: ['user'],
-            order: { createdAt: 'DESC' }
         });
     }
 }

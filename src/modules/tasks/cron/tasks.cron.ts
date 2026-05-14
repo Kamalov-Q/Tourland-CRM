@@ -1,5 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
+import { ConfigService } from "@nestjs/config";
 import { TaskTemplate } from "../entities/task-template.entity";
 import { LessThanOrEqual, MoreThanOrEqual, In, Repository } from "typeorm";
 import { TaskInstance } from "../entities/task-instance.entity";
@@ -11,17 +12,22 @@ import { TaskStatus } from "../enums/task-status.enum";
 
 @Injectable()
 export class TasksCron {
+    private readonly timeZone: string;
+
     constructor(
         @InjectRepository(TaskTemplate)
         private readonly templateRepo: Repository<TaskTemplate>,
         @InjectRepository(TaskInstance)
         private readonly taskRepo: Repository<TaskInstance>,
         @InjectQueue('task-queue')
-        private readonly taskQueue: Queue
-    ) { }
+        private readonly taskQueue: Queue,
+        private readonly configSvc: ConfigService
+    ) {
+        this.timeZone = this.configSvc.get<string>('TZ', 'Asia/Tashkent');
+    }
 
     // Every minute 
-    @Cron('* * * * *')
+    @Cron('* * * * *', { timeZone: 'Asia/Tashkent' })
     async recurringTasksCron() {
         const now = new Date();
 
@@ -66,7 +72,7 @@ export class TasksCron {
     }
 
     // Every day 23:59
-    @Cron('59 23 * * *')
+    @Cron('59 23 * * *', { timeZone: 'Asia/Tashkent' })
     async incompleteTasksCron() {
 
         const today = new Date();

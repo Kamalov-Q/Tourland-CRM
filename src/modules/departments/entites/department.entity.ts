@@ -9,6 +9,9 @@ export class Department {
     @Column({ unique: true })
     name: string;
 
+    @Column({ default: false })
+    isArchived: boolean;
+
     @OneToMany(() => Client, (client) => client.department)
     clients: Client[];
 

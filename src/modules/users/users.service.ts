@@ -109,7 +109,7 @@ export class UsersService {
         });
 
         if (!employee) {
-            throw new NotFoundException('Employeee not found');
+            throw new NotFoundException('Employee not found');
         }
 
         return this.removePassword(employee);
@@ -174,11 +174,11 @@ export class UsersService {
         });
 
         if (!user) {
-            throw new BadRequestException('User not found');
+            throw new NotFoundException('User not found');
         }
 
         if (user.role === UserRole.DIRECTOR) {
-            throw new BadRequestException('Director cannot be deleted');
+            throw new BadRequestException('Director cannot be deactivated');
         }
 
         user.isActive = false;

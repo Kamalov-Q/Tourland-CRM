@@ -12,6 +12,8 @@ import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
 import { AttendanceModule } from './modules/attendance/attendance.module';
 import { ArchiveModule } from './modules/archive/archive.module';
+import { FormsModule } from './modules/forms/forms.module';
+import { HealthModule } from './modules/health/health.module';
 
 @Module({
   imports: [ConfigModule.forRoot({
@@ -31,11 +33,14 @@ import { ArchiveModule } from './modules/archive/archive.module';
       synchronize: true
     })
   }),
-  BullModule.forRoot({
-    connection: {
-      host: 'localhost',
-      port: 6379
-    }
+  BullModule.forRootAsync({
+    inject: [ConfigService],
+    useFactory: (configSvc: ConfigService) => ({
+      connection: {
+        host: configSvc.get<string>('REDIS_HOST', 'localhost'),
+        port: configSvc.get<number>('REDIS_PORT', 6379),
+      }
+    }),
   }),
 
   // Cron
@@ -47,10 +52,12 @@ import { ArchiveModule } from './modules/archive/archive.module';
     ClientsModule,
     AttendanceModule,
     ArchiveModule,
-    ServeStaticModule.forRoot({
-      rootPath: join(process.cwd(), 'uploads'),
-      serveRoot: '/uploads',
-    }),
+    FormsModule,
+    HealthModule,
+  ServeStaticModule.forRoot({
+    rootPath: join(process.cwd(), 'uploads'),
+    serveRoot: '/uploads',
+  }),
   ],
   controllers: [],
   providers: [],
