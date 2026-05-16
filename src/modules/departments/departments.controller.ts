@@ -16,8 +16,8 @@ export class DepartmentsController {
     constructor(private readonly departmentsService: DepartmentsService) { }
 
     @Post()
-    @Roles(UserRole.DIRECTOR)
-    @ApiOperation({ summary: 'Create department (Director only)' })
+    @Roles(UserRole.DIRECTOR, UserRole.EMPLOYEE)
+    @ApiOperation({ summary: 'Create department' })
     create(@Body() dto: CreateDepartmentDto) {
         return this.departmentsService.create(dto);
     }
@@ -37,23 +37,23 @@ export class DepartmentsController {
     }
 
     @Patch(':id')
-    @Roles(UserRole.DIRECTOR)
-    @ApiOperation({ summary: 'Update department name (Director only)' })
+    @Roles(UserRole.DIRECTOR, UserRole.EMPLOYEE)
+    @ApiOperation({ summary: 'Update department name' })
     update(@Param('id') id: string, @Body() dto: UpdateDepartmentDto) {
         return this.departmentsService.update(id, dto);
     }
 
     @Patch(':id/archive')
-    @Roles(UserRole.DIRECTOR)
-    @ApiOperation({ summary: 'Toggle archive status (Director only)' })
+    @Roles(UserRole.DIRECTOR, UserRole.EMPLOYEE)
+    @ApiOperation({ summary: 'Toggle archive status' })
     toggleArchive(@Param('id') id: string) {
         return this.departmentsService.toggleArchive(id);
     }
 
     @Delete(':id')
-    @Roles(UserRole.DIRECTOR)
+    @Roles(UserRole.DIRECTOR, UserRole.EMPLOYEE)
     @HttpCode(HttpStatus.NO_CONTENT)
-    @ApiOperation({ summary: 'Delete department (Director only)' })
+    @ApiOperation({ summary: 'Delete department' })
     async remove(@Param('id') id: string) {
         await this.departmentsService.remove(id);
     }

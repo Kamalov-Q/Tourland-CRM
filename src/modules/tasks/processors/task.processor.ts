@@ -131,6 +131,18 @@ export class TasksProcessor extends WorkerHost {
                 title: template.title
             });
         }
+
+        // Log to activity archive
+        await this.dataSource.manager.save(ActivityLog, {
+            userId: template.createdBy,
+            actionType: 'TASK_CREATED',
+            details: {
+                taskId: savedTask.id,
+                title: template.title,
+                assignedTo: template.assignedTo,
+                dueDate: today
+            }
+        });
     }
 
     async markIncomplete(data: any) {

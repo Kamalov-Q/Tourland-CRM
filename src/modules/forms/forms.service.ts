@@ -76,7 +76,7 @@ export class FormsService {
     return { success: true };
   }
 
-  async submitForm(id: string, data: Record<string, string>) {
+  async submitForm(id: string, data: Record<string, any>) {
     const form = await this.findOne(id);
 
     // Dynamically find fullName and phone fields by common label patterns

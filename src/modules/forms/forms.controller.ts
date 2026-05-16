@@ -35,27 +35,27 @@ export class FormsController {
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiBearerAuth()
-  @Roles(UserRole.DIRECTOR)
+  @Roles(UserRole.DIRECTOR, UserRole.EMPLOYEE)
   @Post()
-  @ApiOperation({ summary: 'Create a new form template (Director only)' })
+  @ApiOperation({ summary: 'Create a new form template' })
   create(@Body() dto: CreateFormDto) {
     return this.formsService.create(dto);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiBearerAuth()
-  @Roles(UserRole.DIRECTOR)
+  @Roles(UserRole.DIRECTOR, UserRole.EMPLOYEE)
   @Patch(':id')
-  @ApiOperation({ summary: 'Update a form template (Director only)' })
+  @ApiOperation({ summary: 'Update a form template' })
   update(@Param('id') id: string, @Body() dto: CreateFormDto) {
     return this.formsService.update(id, dto);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiBearerAuth()
-  @Roles(UserRole.DIRECTOR)
+  @Roles(UserRole.DIRECTOR, UserRole.EMPLOYEE)
   @Delete(':id')
-  @ApiOperation({ summary: 'Delete a form template (Director only)' })
+  @ApiOperation({ summary: 'Delete a form template' })
   remove(@Param('id') id: string) {
     return this.formsService.remove(id);
   }
