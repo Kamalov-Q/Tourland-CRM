@@ -27,11 +27,9 @@ import { ActivityLog } from '../archive/entities/activity-log.entity';
             ActivityLog
         ]),
         forwardRef(() => UsersModule),
-        // Redis Queue
         BullModule.registerQueue({
             name: 'task-queue',
         }),
-        // JWT for WebSocket auth
         JwtModule.registerAsync({
             imports: [ConfigModule],
             inject: [ConfigService],
@@ -47,6 +45,6 @@ import { ActivityLog } from '../archive/entities/activity-log.entity';
         TasksCron,
         NotificationGateway
     ],
-    exports: [TasksService]
+    exports: [TasksService, NotificationGateway]
 })
 export class TasksModule { }

@@ -9,6 +9,7 @@ import { Payment } from './entities/payment.entity';
 import { Department } from '../departments/entites/department.entity';
 import { ClientStage, SaleStatus } from './enums/client.enums';
 import { AuthenticatedUser } from 'src/common/types/auth-request.type';
+import { ActivityLog } from '../archive/entities/activity-log.entity';
 
 @Injectable()
 export class ClientsService {
@@ -25,6 +26,9 @@ export class ClientsService {
         @InjectRepository(Payment)
         private readonly paymentRepo: Repository<Payment>,
 
+        @InjectRepository(ActivityLog)
+        private readonly activityRepo: Repository<ActivityLog>,
+
         private readonly dataSource: DataSource,
     ) { }
 
@@ -39,7 +43,14 @@ export class ClientsService {
             departmentId: department.id,
         });
 
-        return this.clientRepo.save(client);
+        const saved = await this.clientRepo.save(client);
+        
+        await this.activityRepo.save({
+            actionType: 'CLIENT_CREATED',
+            details: { clientId: saved.id, fullName: saved.fullName }
+        });
+
+        return saved;
     }
 
     findAll(query: { departmentId?: string; stage?: ClientStage }): Promise<Client[]> {
@@ -70,7 +81,14 @@ export class ClientsService {
             if (!dep) throw new BadRequestException('Department not found');
         }
         Object.assign(client, dto);
-        return this.clientRepo.save(client);
+        const saved = await this.clientRepo.save(client);
+
+        await this.activityRepo.save({
+            actionType: 'CLIENT_UPDATED',
+            details: { clientId: saved.id, fullName: saved.fullName, updates: Object.keys(dto) }
+        });
+
+        return saved;
     }
 
     async remove(id: string): Promise<void> {
@@ -86,7 +104,15 @@ export class ClientsService {
             authorName: `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || user.phoneNumber,
             authorRole: user.role,
         });
-        return this.noteRepo.save(note);
+        const saved = await this.noteRepo.save(note);
+
+        await this.activityRepo.save({
+            userId: user.id || undefined,
+            actionType: 'CLIENT_NOTE_ADDED',
+            details: { clientId, text: saved.text }
+        });
+
+        return saved;
     }
 
     async addPayment(clientId: string, dto: AddPaymentDto, user: AuthenticatedUser): Promise<Payment> {
@@ -118,6 +144,12 @@ export class ClientsService {
                 }
             }
 
+            await manager.save(ActivityLog, {
+                userId: user.id || undefined,
+                actionType: 'CLIENT_PAYMENT_ADDED',
+                details: { clientId, amount: payment.amount }
+            });
+
             return saved;
         });
     }
@@ -133,6 +165,13 @@ export class ClientsService {
             client.soldAt = new Date();
             client.stage = ClientStage.SOLD;
         }
-        return this.clientRepo.save(client);
+        const saved = await this.clientRepo.save(client);
+
+        await this.activityRepo.save({
+            actionType: 'CLIENT_SALE_UPDATED',
+            details: { clientId, status: saved.saleStatus, totalAmount: saved.saleTotalAmount }
+        });
+
+        return saved;
     }
 }

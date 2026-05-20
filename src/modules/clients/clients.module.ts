@@ -6,9 +6,10 @@ import { Payment } from './entities/payment.entity';
 import { ClientsController } from './clients.controller';
 import { ClientsService } from './clients.service';
 import { Department } from '../departments/entites/department.entity';
+import { ActivityLog } from '../archive/entities/activity-log.entity';
 
 @Module({
-    imports: [TypeOrmModule.forFeature([Client, ClientNote, Payment, Department])],
+    imports: [TypeOrmModule.forFeature([Client, ClientNote, Payment, Department, ActivityLog])],
     controllers: [ClientsController],
     providers: [ClientsService],
 })

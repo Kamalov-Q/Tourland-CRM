@@ -61,4 +61,12 @@ export class NotificationGateway implements OnGatewayConnection {
     emitTaskIncomplete(userId: string, payload: any) {
         this.server.to(userId).emit('taskIncomplete', payload);
     }
+
+    emitAttendanceCheckedIn(userId: string, payload: any) {
+        this.server.to(userId).emit('attendanceCheckedIn', payload);
+    }
+
+    emitAttendanceCheckedOut(userId: string, payload: any) {
+        this.server.to(userId).emit('attendanceCheckedOut', payload);
+    }
 }

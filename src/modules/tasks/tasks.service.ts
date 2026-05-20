@@ -86,18 +86,25 @@ export class TasksService {
 
         const saved = await this.templateRepo.save(template);
 
-        const todayDate = new Date();
-        const startDay = new Date(start);
-        startDay.setHours(0, 0, 0, 0);
-        const endDay = new Date(end);
-        endDay.setHours(23, 59, 59, 999);
+        const tzDateStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tashkent' });
+        const todayDate = new Date(`${tzDateStr}T00:00:00.000Z`);
+
+        const startDay = new Date(`${dto.startDate}T00:00:00.000Z`);
+        const endDay = new Date(`${dto.endDate}T23:59:59.999Z`);
+        
+        const todayStart = new Date(`${tzDateStr}T00:00:00.000Z`);
 
         if (todayDate >= startDay && todayDate <= endDay) {
-            await this.taskQueue.add(
-                'generate-task',
-                { templateId: saved.id, isCron: false },
-                { attempts: 3 }
-            );
+            const isToday = todayStart.getTime() === startDay.getTime();
+            const currentTime = todayDate.toLocaleTimeString('en-GB', { timeZone: 'Asia/Tashkent', hour: '2-digit', minute: '2-digit' });
+            
+            if (!isToday || currentTime >= dto.notifyAt) {
+                await this.taskQueue.add(
+                    'generate-task',
+                    { templateId: saved.id, isCron: false },
+                    { attempts: 3 }
+                );
+            }
         }
 
         return saved;
@@ -364,7 +371,7 @@ export class TasksService {
         });
 
         const now = new Date();
-        const currentTime = now.toTimeString().slice(0, 5);
+        const currentTime = now.toLocaleTimeString('en-GB', { timeZone: 'Asia/Tashkent', hour: '2-digit', minute: '2-digit' });
         const todayD = new Date();
         todayD.setHours(0,0,0,0);
 

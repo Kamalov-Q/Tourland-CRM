@@ -56,14 +56,15 @@ export class TasksProcessor extends WorkerHost {
 
         if (!employee?.isActive) return;
 
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+        const tzDateStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tashkent' });
+        const today = new Date(`${tzDateStr}T00:00:00.000Z`);
 
-        const startDay = new Date(template.startDate);
-        startDay.setHours(0, 0, 0, 0);
+        // Safely extract YYYY-MM-DD from typeorm timestamp assuming UTC naive parsing
+        const startStr = new Date(template.startDate).toISOString().split('T')[0];
+        const startDay = new Date(`${startStr}T00:00:00.000Z`);
 
-        const endDay = new Date(template.endDate);
-        endDay.setHours(23, 59, 59, 999);
+        const endStr = new Date(template.endDate).toISOString().split('T')[0];
+        const endDay = new Date(`${endStr}T23:59:59.999Z`);
 
         if (today < startDay || today > endDay) {
             return;
@@ -71,7 +72,7 @@ export class TasksProcessor extends WorkerHost {
 
 
         const now = new Date();
-        const currentTime = now.toTimeString().slice(0, 5);
+        const currentTime = now.toLocaleTimeString('en-GB', { timeZone: 'Asia/Tashkent', hour: '2-digit', minute: '2-digit' });
         const shouldNotifyNow = data.isCron || template.notifyAt <= currentTime;
 
         // Preventing duplications
@@ -94,6 +95,13 @@ export class TasksProcessor extends WorkerHost {
                     taskId: existing.id,
                     title: template.title
                 });
+
+                if (template.createdBy) {
+                    this.gateway.emitTaskCreated(template.createdBy, {
+                        taskId: existing.id,
+                        title: template.title
+                    });
+                }
             }
             return;
         }
@@ -130,6 +138,13 @@ export class TasksProcessor extends WorkerHost {
                 taskId: savedTask.id,
                 title: template.title
             });
+
+            if (template.createdBy) {
+                this.gateway.emitTaskCreated(template.createdBy, {
+                    taskId: savedTask.id,
+                    title: template.title
+                });
+            }
         }
 
         // Log to activity archive

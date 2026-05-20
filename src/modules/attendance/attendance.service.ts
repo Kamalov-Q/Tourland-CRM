@@ -2,6 +2,9 @@ import { BadRequestException, Injectable, Logger, NotFoundException } from "@nes
 import { InjectRepository } from "@nestjs/typeorm";
 import { Attendance } from "./entities/attendance.entity";
 import { Repository } from "typeorm";
+import { ActivityLog } from "../archive/entities/activity-log.entity";
+import { NotificationGateway } from "../tasks/gateways/notification.gateway";
+import { User } from "../users/entities/user.entity";
 import { CheckInDto } from "./dto/check-in.dto";
 import { CheckOutDto } from "./dto/check-out.dto";
 import * as fs from 'fs/promises';
@@ -13,12 +16,15 @@ import { v4 as uuidv4 } from 'uuid';
 export class AttendanceService {
     private readonly uploadPath = path.join(process.cwd(), 'uploads', 'attendance');
     private readonly logger = new Logger(AttendanceService.name);
-
     constructor(
         @InjectRepository(Attendance)
-        private readonly attendanceRepo: Repository<Attendance>
+        private readonly attendanceRepo: Repository<Attendance>,
+        @InjectRepository(ActivityLog)
+        private readonly activityRepo: Repository<ActivityLog>,
+        @InjectRepository(User)
+        private readonly userRepo: Repository<User>,
+        private readonly notificationGateway: NotificationGateway,
     ) {
-        // Ensure upload directory exists (sync is fine once at startup)
         if (!fsSync.existsSync(this.uploadPath)) {
             fsSync.mkdirSync(this.uploadPath, { recursive: true });
             this.logger.log(`Created attendance upload directory at ${this.uploadPath}`);
@@ -48,6 +54,17 @@ export class AttendanceService {
         return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tashkent' });
     }
 
+    /** Round check-in time: minutes < 30 → floor to hour, minutes >= 30 → ceil to next hour */
+    private roundCheckInTime(date: Date): Date {
+        const rounded = new Date(date);
+        if (date.getMinutes() < 30) {
+            rounded.setMinutes(0, 0, 0);
+        } else {
+            rounded.setHours(date.getHours() + 1, 0, 0, 0);
+        }
+        return rounded;
+    }
+
     async checkIn(employeeId: string, dto: CheckInDto) {
         const date = this.getTodayStr();
         const exists = await this.attendanceRepo.findOne({ where: { employeeId, date } });
@@ -61,11 +78,28 @@ export class AttendanceService {
         const attendance = this.attendanceRepo.create({
             employeeId,
             date,
-            checkInAt: new Date(),
+            checkInAt: this.roundCheckInTime(new Date()),
             photo: photoUrl
         });
+        const saved = await this.attendanceRepo.save(attendance);
 
-        return this.attendanceRepo.save(attendance);
+        await this.activityRepo.save({
+            userId: employeeId,
+            actionType: 'ATTENDANCE_CHECK_IN',
+            details: { attendanceId: saved.id, time: saved.checkInAt }
+        });
+
+        // Notify director of check-in
+        const employee = await this.userRepo.findOne({ where: { id: employeeId } });
+        if (employee && employee.parentId) {
+            this.notificationGateway.emitAttendanceCheckedIn(employee.parentId, {
+                employeeId,
+                name: `${employee.firstName} ${employee.lastName}`,
+                checkInAt: saved.checkInAt
+            });
+        }
+
+        return saved;
     }
 
     async checkOut(employeeId: string, dto: CheckOutDto) {
@@ -85,7 +119,25 @@ export class AttendanceService {
         attendance.checkOutAt = new Date();
         attendance.checkOutPhoto = photoUrl;
 
-        return this.attendanceRepo.save(attendance);
+        const saved = await this.attendanceRepo.save(attendance);
+
+        await this.activityRepo.save({
+            userId: employeeId,
+            actionType: 'ATTENDANCE_CHECK_OUT',
+            details: { attendanceId: saved.id, time: saved.checkOutAt }
+        });
+
+        // Notify director of check-out
+        const employee = await this.userRepo.findOne({ where: { id: employeeId } });
+        if (employee && employee.parentId) {
+            this.notificationGateway.emitAttendanceCheckedOut(employee.parentId, {
+                employeeId,
+                name: `${employee.firstName} ${employee.lastName}`,
+                checkOutAt: saved.checkOutAt
+            });
+        }
+
+        return saved;
     }
 
     find(query: { employeeId?: string; date?: string }) {
