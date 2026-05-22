@@ -8,6 +8,8 @@ import { Roles } from 'src/common/decorators/roles.decorator';
 import { UserRole } from 'src/modules/users/entities/user.entity';
 import { SubmitFormDto } from './dto/submit-form.dto';
 
+import { UserActiveGuard } from 'src/common/guards/user-active.guard';
+
 @ApiTags('Forms')
 @Controller('forms')
 export class FormsController {
@@ -33,7 +35,7 @@ export class FormsController {
     return this.formsService.findAll();
   }
 
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, UserActiveGuard)
   @ApiBearerAuth()
   @Roles(UserRole.DIRECTOR, UserRole.EMPLOYEE)
   @Post()
@@ -42,7 +44,7 @@ export class FormsController {
     return this.formsService.create(dto);
   }
 
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, UserActiveGuard)
   @ApiBearerAuth()
   @Roles(UserRole.DIRECTOR, UserRole.EMPLOYEE)
   @Patch(':id')
@@ -51,7 +53,7 @@ export class FormsController {
     return this.formsService.update(id, dto);
   }
 
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, UserActiveGuard)
   @ApiBearerAuth()
   @Roles(UserRole.DIRECTOR, UserRole.EMPLOYEE)
   @Delete(':id')

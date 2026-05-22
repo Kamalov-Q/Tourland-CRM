@@ -8,10 +8,12 @@ import { CreateDepartmentDto } from './dto/create-department.dto';
 import { UpdateDepartmentDto } from './dto/update-department.dto';
 import { DepartmentsService } from './departments.service';
 
+import { UserActiveGuard } from '../../common/guards/user-active.guard';
+
 @ApiTags('Departments')
 @ApiBearerAuth()
 @Controller('departments')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, UserActiveGuard)
 export class DepartmentsController {
     constructor(private readonly departmentsService: DepartmentsService) { }
 

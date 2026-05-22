@@ -6,10 +6,11 @@ import { AttendanceController } from "./attendance.controller";
 import { ActivityLog } from "../archive/entities/activity-log.entity";
 import { TasksModule } from "../tasks/tasks.module";
 import { User } from "../users/entities/user.entity";
+import { AttendanceCron } from "./cron/attendance.cron";
 
 @Module({
     imports: [TypeOrmModule.forFeature([Attendance, ActivityLog, User]), TasksModule],
-    providers: [AttendanceService],
+    providers: [AttendanceService, AttendanceCron],
     controllers: [AttendanceController],
     exports: [AttendanceService]
 })

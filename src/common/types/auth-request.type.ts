@@ -13,6 +13,7 @@ export interface AuthenticatedUser {
     firstName: string;
     lastName: string;
     role: UserRole;
+    isActive: boolean;
 }
 
 export interface AuthenticatedRequest extends Request {

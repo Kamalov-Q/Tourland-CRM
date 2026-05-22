@@ -11,10 +11,12 @@ import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import type { AuthenticatedUser } from 'src/common/types/auth-request.type';
 import { ClientStage } from './enums/client.enums';
 
+import { UserActiveGuard } from '../../common/guards/user-active.guard';
+
 @ApiTags('Clients')
 @ApiBearerAuth()
 @Controller('clients')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, UserActiveGuard)
 export class ClientsController {
     constructor(private readonly clientsService: ClientsService) { }
 

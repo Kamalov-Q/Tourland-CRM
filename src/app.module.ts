@@ -15,6 +15,9 @@ import { ArchiveModule } from './modules/archive/archive.module';
 import { FormsModule } from './modules/forms/forms.module';
 import { HealthModule } from './modules/health/health.module';
 
+import { APP_GUARD } from '@nestjs/core';
+import { UserActiveGuard } from './common/guards/user-active.guard';
+
 @Module({
   imports: [ConfigModule.forRoot({
     isGlobal: true

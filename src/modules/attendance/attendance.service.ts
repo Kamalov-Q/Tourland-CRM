@@ -1,10 +1,10 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Attendance } from "./entities/attendance.entity";
-import { Repository } from "typeorm";
+import { Attendance, AttendanceStatus } from "./entities/attendance.entity";
+import { IsNull, Repository } from "typeorm";
 import { ActivityLog } from "../archive/entities/activity-log.entity";
 import { NotificationGateway } from "../tasks/gateways/notification.gateway";
-import { User } from "../users/entities/user.entity";
+import { User, UserRole } from "../users/entities/user.entity";
 import { CheckInDto } from "./dto/check-in.dto";
 import { CheckOutDto } from "./dto/check-out.dto";
 import * as fs from 'fs/promises';
@@ -16,6 +16,7 @@ import { v4 as uuidv4 } from 'uuid';
 export class AttendanceService {
     private readonly uploadPath = path.join(process.cwd(), 'uploads', 'attendance');
     private readonly logger = new Logger(AttendanceService.name);
+
     constructor(
         @InjectRepository(Attendance)
         private readonly attendanceRepo: Repository<Attendance>,
@@ -79,7 +80,8 @@ export class AttendanceService {
             employeeId,
             date,
             checkInAt: this.roundCheckInTime(new Date()),
-            photo: photoUrl
+            photo: photoUrl,
+            status: AttendanceStatus.PRESENT,
         });
         const saved = await this.attendanceRepo.save(attendance);
 
@@ -114,10 +116,11 @@ export class AttendanceService {
             throw new BadRequestException('Already checked out today');
         }
 
-        const photoUrl = await this.savePhoto(dto.photo);
+        const photoUrl = dto.photo ? await this.savePhoto(dto.photo) : null;
 
         attendance.checkOutAt = new Date();
         attendance.checkOutPhoto = photoUrl;
+        attendance.status = AttendanceStatus.ATTENDED;
 
         const saved = await this.attendanceRepo.save(attendance);
 
@@ -138,6 +141,95 @@ export class AttendanceService {
         }
 
         return saved;
+    }
+
+    /**
+     * Auto-checkout all employees still PRESENT at 7 PM.
+     * Sets checkOutAt to 19:00, uses a default placeholder photo, status → ATTENDED.
+     */
+    async autoCheckoutAll(): Promise<void> {
+        const date = this.getTodayStr();
+
+        const active = await this.attendanceRepo.find({
+            where: {
+                date,
+                status: AttendanceStatus.PRESENT,
+                checkOutAt: IsNull(),
+            },
+            relations: ['employee'],
+        });
+
+        if (active.length === 0) return;
+
+        // Build the 19:00 timestamp for today in Tashkent time
+        const checkoutTime = new Date();
+        checkoutTime.setHours(19, 0, 0, 0);
+
+        const defaultPhoto = '/uploads/attendance/default.jpg';
+
+        for (const rec of active) {
+            rec.checkOutAt = checkoutTime;
+            rec.checkOutPhoto = defaultPhoto;
+            rec.status = AttendanceStatus.ATTENDED;
+            await this.attendanceRepo.save(rec);
+
+            await this.activityRepo.save({
+                userId: rec.employeeId,
+                actionType: 'ATTENDANCE_AUTO_CHECKOUT',
+                details: { attendanceId: rec.id, note: 'Auto-checked out at 19:00' }
+            });
+
+            // Notify director
+            if (rec.employee && rec.employee.parentId) {
+                this.notificationGateway.emitAttendanceCheckedOut(rec.employee.parentId, {
+                    employeeId: rec.employeeId,
+                    name: `${rec.employee.firstName} ${rec.employee.lastName}`,
+                    checkOutAt: checkoutTime,
+                    autoCheckout: true,
+                });
+            }
+        }
+
+        this.logger.log(`Auto-checked out ${active.length} employee(s) at 19:00`);
+    }
+
+    /**
+     * Mark ABSENT for all active employees who have no attendance record today.
+     */
+    async markAbsentAll(): Promise<void> {
+        const date = this.getTodayStr();
+
+        // Get all active employees
+        const employees = await this.userRepo.find({
+            where: { role: UserRole.EMPLOYEE, isActive: true },
+        });
+
+        for (const emp of employees) {
+            const existing = await this.attendanceRepo.findOne({
+                where: { employeeId: emp.id, date },
+            });
+
+            if (!existing) {
+                const absent = this.attendanceRepo.create({
+                    employeeId: emp.id,
+                    date,
+                    checkInAt: null,
+                    checkOutAt: null,
+                    photo: null,
+                    checkOutPhoto: null,
+                    status: AttendanceStatus.ABSENT,
+                });
+                await this.attendanceRepo.save(absent);
+
+                await this.activityRepo.save({
+                    userId: emp.id,
+                    actionType: 'ATTENDANCE_ABSENT',
+                    details: { date, note: 'Marked absent by system at 19:00' }
+                });
+
+                this.logger.log(`Marked ${emp.firstName} ${emp.lastName} as ABSENT for ${date}`);
+            }
+        }
     }
 
     find(query: { employeeId?: string; date?: string }) {

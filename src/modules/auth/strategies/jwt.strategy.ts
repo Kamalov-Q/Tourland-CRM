@@ -19,14 +19,10 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     }
 
     async validate(payload: JwtPayload): Promise<AuthenticatedUser> {
-        const user = await this.usersSvc.findActiveById(payload.sub);
+        const user = await this.usersSvc.findById(payload.sub);
 
         if (!user) {
-            throw new UnauthorizedException('User not found or inactive');
-        }
-
-        if (!user.isActive) {
-            throw new UnauthorizedException('User is inactive');
+            throw new UnauthorizedException('User not found');
         }
 
         return {
@@ -34,7 +30,8 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
             phoneNumber: user.phoneNumber,
             firstName: user.firstName,
             lastName: user.lastName,
-            role: user.role
+            role: user.role,
+            isActive: user.isActive
         }
     }
 }

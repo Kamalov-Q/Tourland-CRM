@@ -30,6 +30,12 @@ export class UsersService {
         });
     }
 
+    findById(id: string): Promise<User | null> {
+        return this.userRepo.findOne({
+            where: { id }
+        });
+    }
+
     findByPhoneWithPassword(phoneNumber: string): Promise<User | null> {
         return this.userRepo
             .createQueryBuilder('user')
