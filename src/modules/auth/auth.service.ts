@@ -5,11 +5,14 @@ import { LoginDto } from "./dto/login.dto";
 import * as bcrypt from 'bcrypt';
 import { JwtPayload } from "src/common/types/auth-request.type";
 
+import { ConfigService } from "@nestjs/config";
+
 @Injectable()
 export class AuthService {
     constructor(
         private readonly usersSvc: UsersService,
-        private readonly jwtSvc: JwtService
+        private readonly jwtSvc: JwtService,
+        private readonly configSvc: ConfigService
     ) { }
 
     async login(dto: LoginDto): Promise<{ accessToken: string, refreshToken: string }> {
@@ -94,6 +97,30 @@ export class AuthService {
         } catch (e) {
             throw new UnauthorizedException('Invalid or expired refresh token');
         }
+    }
+
+    async verifyPincode(phoneNumber: string, pincode: string): Promise<{ valid: boolean }> {
+        const user = await this.usersSvc.findByPhoneWithPassword(phoneNumber);
+        if (!user || !user.isActive) {
+            return { valid: false }; // Don't leak user existence directly via explicit error if possible, but valid: false is fine
+        }
+
+        const envPincode = this.configSvc.get<string>('RESET_PINCODE');
+        if (!envPincode || pincode !== envPincode) {
+            return { valid: false };
+        }
+
+        return { valid: true };
+    }
+
+    async forgotPassword(phoneNumber: string, pincode: string, newPassword: string): Promise<{ message: string }> {
+        const check = await this.verifyPincode(phoneNumber, pincode);
+        if (!check.valid) {
+            throw new UnauthorizedException('Invalid phone number or pincode');
+        }
+        
+        await this.usersSvc.resetPasswordByPhone(phoneNumber, newPassword);
+        return { message: 'Password reset successfully' };
     }
 
     async logout(userId: string): Promise<void> {

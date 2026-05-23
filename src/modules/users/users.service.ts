@@ -308,4 +308,17 @@ export class UsersService {
 
     }
 
+    async resetPasswordByPhone(phoneNumber: string, newPassword: string): Promise<void> {
+        const user = await this.userRepo.findOne({
+            where: { phoneNumber, isActive: true }
+        });
+
+        if (!user) {
+            throw new NotFoundException('User not found');
+        }
+
+        user.password = await bcrypt.hash(newPassword, 10);
+        await this.userRepo.save(user);
+    }
+
 }

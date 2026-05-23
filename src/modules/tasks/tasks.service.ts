@@ -97,11 +97,9 @@ export class TasksService {
         let currentDay = new Date(startDay);
         const instancesToCreate: any[] = [];
         while (currentDay <= endDay) {
-            const tempStart = new Date(currentDay);
-            tempStart.setHours(0,0,0,0);
-            
-            const expires = new Date(currentDay);
-            expires.setHours(23,59,59,999);
+            const dateStr = currentDay.toISOString().split('T')[0];
+            const tempStart = new Date(`${dateStr}T00:00:00.000Z`);
+            const expires = new Date(`${dateStr}T23:59:59.999Z`);
 
             instancesToCreate.push({
                 templateId: saved.id,
@@ -110,7 +108,7 @@ export class TasksService {
                 expiresAt: expires,
                 status: TaskStatus.TODO
             });
-            currentDay.setDate(currentDay.getDate() + 1);
+            currentDay.setUTCDate(currentDay.getUTCDate() + 1);
         }
         const instances = this.taskRepo.create(instancesToCreate);
         await this.taskRepo.save(instances);

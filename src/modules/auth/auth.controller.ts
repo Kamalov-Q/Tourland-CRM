@@ -2,6 +2,8 @@ import { Body, Controller, Post } from "@nestjs/common";
 import { AuthService } from "./auth.service";
 import { LoginDto } from "./dto/login.dto";
 import { RefreshDto } from "./dto/refresh.dto";
+import { VerifyPincodeDto } from "./dto/verify-pincode.dto";
+import { ForgotPasswordDto } from "./dto/forgot-password.dto";
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { UseGuards } from "@nestjs/common";
 import { JwtAuthGuard } from "src/common/guards/jwt-auth.guard";
@@ -27,6 +29,18 @@ export class AuthController {
     @ApiOperation({ summary: 'Refresh access token' })
     refresh(@Body() dto: RefreshDto) {
         return this.authSvc.refresh(dto);
+    }
+
+    @Post('verify-pincode')
+    @ApiOperation({ summary: 'Verify pincode for password reset' })
+    verifyPincode(@Body() dto: VerifyPincodeDto) {
+        return this.authSvc.verifyPincode(dto.phoneNumber, dto.pincode);
+    }
+
+    @Post('forgot-password')
+    @ApiOperation({ summary: 'Reset password using pincode' })
+    forgotPassword(@Body() dto: ForgotPasswordDto) {
+        return this.authSvc.forgotPassword(dto.phoneNumber, dto.pincode, dto.newPassword);
     }
 
     @Post('logout')
