@@ -3,15 +3,15 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { TaskTemplate } from "../entities/task-template.entity";
 import { Repository } from "typeorm";
 import { TaskInstance } from "../entities/task-instance.entity";
-import { Notification } from "../entities/notification.entity";
-import { NotificationGateway } from "../gateways/notification.gateway";
 import { User } from "src/modules/users/entities/user.entity";
 import { DataSource } from "typeorm";
 import { TaskStatusHistory } from "../entities/task-status-history.entity";
 import { Job } from "bullmq";
 import { TaskStatus } from "../enums/task-status.enum";
-import { NotificationType } from "../enums/notification-type.enum";
 import { ActivityLog } from "../../archive/entities/activity-log.entity";
+import { Notification } from "src/modules/notifications/entities/notification.entity";
+import { NotificationGateway } from "src/modules/notifications/gateways/notification.gateway";
+import { NotificationType } from "src/modules/notifications/enums/notification-type.enum";
 
 @Processor('task-queue')
 export class TasksProcessor extends WorkerHost {
@@ -88,7 +88,8 @@ export class TasksProcessor extends WorkerHost {
                 await this.notificationRepo.save({
                     userId: template.assignedTo,
                     type: NotificationType.TASK_CREATED,
-                    message: `New task: ${template.title}`
+                    message: `Yangi topshiriq: "${template.title}"`,
+                    data: { taskId: existing.id }
                 });
 
                 this.gateway.emitTaskCreated(template.assignedTo, {
@@ -130,7 +131,8 @@ export class TasksProcessor extends WorkerHost {
             await this.notificationRepo.save({
                 userId: template.assignedTo,
                 type: NotificationType.TASK_CREATED,
-                message: `New task: ${template.title}`
+                message: `Yangi topshiriq: "${template.title}"`,
+                data: { taskId: savedTask.id }
             });
 
             // Websocket
@@ -208,7 +210,8 @@ export class TasksProcessor extends WorkerHost {
             await manager.save(Notification, {
                 userId: task.assignedTo,
                 type: NotificationType.TASK_STATUS_CHANGED,
-                message: `Task marked as incomplete automatically`
+                message: `"${task.template?.title}" topshirig'i muddati o'tganligi sababli tizim tomonidan "bajarilmadi" deb belgilandi`,
+                data: { taskId: task.id }
             });
 
             this.gateway.emitTaskIncomplete(task.assignedTo, {

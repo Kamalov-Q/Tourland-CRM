@@ -1,9 +1,8 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Injectable, Logger } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Attendance, AttendanceStatus } from "./entities/attendance.entity";
 import { IsNull, Repository } from "typeorm";
 import { ActivityLog } from "../archive/entities/activity-log.entity";
-import { NotificationGateway } from "../tasks/gateways/notification.gateway";
 import { User, UserRole } from "../users/entities/user.entity";
 import { CheckInDto } from "./dto/check-in.dto";
 import { CheckOutDto } from "./dto/check-out.dto";
@@ -11,6 +10,9 @@ import * as fs from 'fs/promises';
 import * as fsSync from 'fs';
 import * as path from 'path';
 import { v4 as uuidv4 } from 'uuid';
+import { NotificationGateway } from "../notifications/gateways/notification.gateway";
+import { NotificationsService } from "../notifications/notifications.service";
+import { NotificationType } from "../notifications/enums/notification-type.enum";
 
 @Injectable()
 export class AttendanceService {
@@ -25,6 +27,7 @@ export class AttendanceService {
         @InjectRepository(User)
         private readonly userRepo: Repository<User>,
         private readonly notificationGateway: NotificationGateway,
+        private readonly notificationsService: NotificationsService,
     ) {
         if (!fsSync.existsSync(this.uploadPath)) {
             fsSync.mkdirSync(this.uploadPath, { recursive: true });
@@ -99,6 +102,13 @@ export class AttendanceService {
                 name: `${employee.firstName} ${employee.lastName}`,
                 checkInAt: saved.checkInAt
             });
+
+            await this.notificationsService.createNotification(
+                employee.parentId,
+                NotificationType.ATTENDANCE_UPDATE,
+                `${employee.firstName} ${employee.lastName} ishga keldi`,
+                { employeeId }
+            );
         }
 
         return saved;
@@ -138,6 +148,13 @@ export class AttendanceService {
                 name: `${employee.firstName} ${employee.lastName}`,
                 checkOutAt: saved.checkOutAt
             });
+
+            await this.notificationsService.createNotification(
+                employee.parentId,
+                NotificationType.ATTENDANCE_UPDATE,
+                `${employee.firstName} ${employee.lastName} ishdan ketdi`,
+                { employeeId }
+            );
         }
 
         return saved;
@@ -187,6 +204,13 @@ export class AttendanceService {
                     checkOutAt: checkoutTime,
                     autoCheckout: true,
                 });
+
+                await this.notificationsService.createNotification(
+                    rec.employee.parentId,
+                    NotificationType.ATTENDANCE_UPDATE,
+                    `${rec.employee.firstName} ${rec.employee.lastName} tizim tomonidan avtomatik ishdan chiqarildi (checkout)`,
+                    { employeeId: rec.employeeId }
+                );
             }
         }
 

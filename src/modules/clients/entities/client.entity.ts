@@ -37,6 +37,9 @@ export class Client {
     @Column({ type: 'float', nullable: true })
     saleTotalAmount: number | null;
 
+    @Column({ type: 'float', nullable: true })
+    saleAdditionalPrice: number | null;
+
     @Column({ type: 'timestamp', nullable: true })
     nextPaymentAt: Date | null;
 

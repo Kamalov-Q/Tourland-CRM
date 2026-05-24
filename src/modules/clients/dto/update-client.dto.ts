@@ -65,6 +65,12 @@ export class SetSaleDto {
     @IsString()
     nextPaymentAt?: string;
 
+    @ApiProperty({ required: false, example: 50000 })
+    @IsOptional()
+    @IsNumber()
+    @Min(0)
+    additionalPrice?: number;
+
     @ApiProperty({ required: false, example: 100000 })
     @IsOptional()
     @IsNumber()

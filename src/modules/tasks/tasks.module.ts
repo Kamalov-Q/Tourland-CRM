@@ -7,14 +7,14 @@ import { TasksService } from './tasks.service';
 import { TaskTemplate } from './entities/task-template.entity';
 import { TaskInstance } from './entities/task-instance.entity';
 import { TaskStatusHistory } from './entities/task-status-history.entity';
-import { Notification } from './entities/notification.entity';
 import { BullModule } from '@nestjs/bullmq';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { TasksProcessor } from './processors/task.processor';
 import { TasksCron } from './cron/tasks.cron';
-import { NotificationGateway } from './gateways/notification.gateway';
 import { UsersModule } from '../users/users.module';
 import { User } from '../users/entities/user.entity';
 import { ActivityLog } from '../archive/entities/activity-log.entity';
+import { Notification } from '../notifications/entities/notification.entity';
 
 @Module({
     imports: [
@@ -22,11 +22,12 @@ import { ActivityLog } from '../archive/entities/activity-log.entity';
             TaskTemplate,
             TaskInstance,
             TaskStatusHistory,
-            Notification,
             User,
-            ActivityLog
+            ActivityLog,
+            Notification
         ]),
         forwardRef(() => UsersModule),
+        NotificationsModule,
         BullModule.registerQueue({
             name: 'task-queue',
         }),
@@ -43,8 +44,7 @@ import { ActivityLog } from '../archive/entities/activity-log.entity';
         TasksService,
         TasksProcessor,
         TasksCron,
-        NotificationGateway
     ],
-    exports: [TasksService, NotificationGateway]
+    exports: [TasksService]
 })
 export class TasksModule { }

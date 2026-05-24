@@ -6,6 +6,9 @@ import { FormField } from './entities/form-field.entity';
 import { CreateFormDto } from './dto/create-form.dto';
 import { ActivityLog } from '../archive/entities/activity-log.entity';
 import { Client } from '../clients/entities/client.entity';
+import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationType } from '../notifications/enums/notification-type.enum';
+import { User, UserRole } from '../users/entities/user.entity';
 
 @Injectable()
 export class FormsService {
@@ -16,6 +19,9 @@ export class FormsService {
     private readonly fieldRepo: Repository<FormField>,
     @InjectRepository(ActivityLog)
     private readonly activityRepo: Repository<ActivityLog>,
+    @InjectRepository(User)
+    private readonly userRepo: Repository<User>,
+    private readonly notificationsService: NotificationsService,
     private readonly dataSource: DataSource,
   ) { }
 
@@ -121,6 +127,17 @@ export class FormsService {
         actionType: 'CLIENT_CREATED',
         details: { clientId: savedClient.id, fullName: savedClient.fullName, source: form.title }
       });
+
+      // Notify Director
+      const director = await manager.findOne(User, { where: { role: UserRole.DIRECTOR, isActive: true } });
+      if (director) {
+        await this.notificationsService.createNotification(
+          director.id,
+          NotificationType.FORM_UPDATE,
+          `Yangi ariqa kelib tushdi: "${form.title}" (Mijoz: ${savedClient.fullName})`,
+          { clientId: savedClient.id }
+        );
+      }
 
       return savedClient;
     });

@@ -26,6 +26,12 @@ export class Notification {
     })
     isRead: boolean;
 
+    @Column({
+        type: 'json',
+        nullable: true
+    })
+    data?: any;
+
     @CreateDateColumn()
     createdAt: Date;
 

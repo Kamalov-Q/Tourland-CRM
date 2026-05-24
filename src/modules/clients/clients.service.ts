@@ -11,6 +11,8 @@ import { ClientStage, SaleStatus } from './enums/client.enums';
 import { AuthenticatedUser } from 'src/common/types/auth-request.type';
 import { ActivityLog } from '../archive/entities/activity-log.entity';
 import { ClientsGateway } from './gateways/clients.gateway';
+import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationType } from '../notifications/enums/notification-type.enum';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { LessThanOrEqual, IsNull } from 'typeorm';
 
@@ -33,6 +35,8 @@ export class ClientsService {
         private readonly activityRepo: Repository<ActivityLog>,
 
         private readonly clientsGateway: ClientsGateway,
+
+        private readonly notificationsService: NotificationsService,
 
         private readonly dataSource: DataSource,
     ) { }
@@ -200,6 +204,7 @@ export class ClientsService {
         const client = await this.findOne(clientId);
         client.saleStatus = dto.status;
         if (dto.totalAmount !== undefined) client.saleTotalAmount = dto.totalAmount;
+        if (dto.additionalPrice !== undefined) client.saleAdditionalPrice = dto.additionalPrice;
         if (dto.nextPaymentAt !== undefined) {
             client.nextPaymentAt = dto.nextPaymentAt ? new Date(dto.nextPaymentAt) : null;
         }
@@ -243,6 +248,17 @@ export class ClientsService {
 
         for (const client of callReminders) {
             this.clientsGateway.emitReminder(client.id, client.fullName);
+            
+            // Create persistent notification for the current call handler
+            if (client.inCallByEmployeeId) {
+                await this.notificationsService.createNotification(
+                    client.inCallByEmployeeId,
+                    NotificationType.CLIENT_REMINDER,
+                    `Mijoz ${client.fullName} uchun eslatma vaqti keldi`,
+                    { clientId: client.id }
+                );
+            }
+
             client.remindAt = null;
             await this.clientRepo.save(client);
         }
@@ -267,6 +283,17 @@ export class ClientsService {
 
         for (const client of paymentReminders) {
             this.clientsGateway.emitPaymentReminder(client.id, client.fullName);
+            
+            // Create persistent notification
+            if (client.inCallByEmployeeId) {
+                await this.notificationsService.createNotification(
+                    client.inCallByEmployeeId,
+                    NotificationType.CLIENT_PAYMENT,
+                    `Mijoz ${client.fullName} uchun to'lov eslatmasi`,
+                    { clientId: client.id }
+                );
+            }
+
             client.lastPaymentNotifiedAt = now;
             await this.clientRepo.save(client);
         }

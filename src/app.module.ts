@@ -14,9 +14,7 @@ import { AttendanceModule } from './modules/attendance/attendance.module';
 import { ArchiveModule } from './modules/archive/archive.module';
 import { FormsModule } from './modules/forms/forms.module';
 import { HealthModule } from './modules/health/health.module';
-
-import { APP_GUARD } from '@nestjs/core';
-import { UserActiveGuard } from './common/guards/user-active.guard';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 
 @Module({
   imports: [ConfigModule.forRoot({
@@ -45,8 +43,6 @@ import { UserActiveGuard } from './common/guards/user-active.guard';
       }
     }),
   }),
-
-  // Cron
   ScheduleModule.forRoot(),
     AuthModule,
     UsersModule,
@@ -57,6 +53,7 @@ import { UserActiveGuard } from './common/guards/user-active.guard';
     ArchiveModule,
     FormsModule,
     HealthModule,
+    NotificationsModule,
   ServeStaticModule.forRoot({
     rootPath: join(process.cwd(), 'uploads'),
     serveRoot: '/uploads',

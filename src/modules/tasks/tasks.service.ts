@@ -4,11 +4,10 @@ import { TaskTemplate } from "./entities/task-template.entity";
 import { DataSource, Repository, LessThan, In, LessThanOrEqual } from "typeorm";
 import { TaskInstance } from "./entities/task-instance.entity";
 import { TaskStatusHistory } from "./entities/task-status-history.entity";
-import { Notification } from "./entities/notification.entity";
-import { NotificationGateway } from "./gateways/notification.gateway";
 import { CreateTaskTemplateDto } from "./dto/create-task-template.dto";
 import { TaskStatus } from "./enums/task-status.enum";
-import { NotificationType } from "./enums/notification-type.enum";
+import { NotificationsService } from "../notifications/notifications.service";
+import { NotificationType } from "../notifications/enums/notification-type.enum";
 import { User, UserRole } from "../users/entities/user.entity";
 import { ActivityLog } from "../archive/entities/activity-log.entity";
 import { InjectQueue } from "@nestjs/bullmq";
@@ -30,13 +29,10 @@ export class TasksService {
         @InjectRepository(TaskStatusHistory)
         private readonly historyRepo: Repository<TaskStatusHistory>,
 
-        @InjectRepository(Notification)
-        private readonly notificationRepo: Repository<Notification>,
-        
         @InjectRepository(ActivityLog)
         private readonly activityRepo: Repository<ActivityLog>,
 
-        private gateway: NotificationGateway,
+        private readonly notificationsService: NotificationsService,
 
         private dataSource: DataSource,
 
@@ -229,22 +225,27 @@ export class TasksService {
                     }
                 });
 
-                // Notification & Socket
+                // Notification & Socket & Web Push
                 const notifyUserId = userId === task.assignedTo ? task.template.createdBy : task.assignedTo;
 
-                await manager.save(Notification, {
-                    userId: notifyUserId,
-                    type: NotificationType.TASK_STATUS_CHANGED,
-                    message: `Task status changed to ${newStatus}`
-                });
+                const statusMap: Record<string, string> = {
+                  todo: "bajarilishi kerak",
+                  in_progress: "bajarilmoqda",
+                  pending: "tekshiruvda",
+                  done: "yakunlandi",
+                  incomplete: "bajarilmadi",
+                  rejected: "rad etildi",
+                };
+                const statusLabel = statusMap[newStatus] || newStatus;
 
-                this.gateway.emitTaskStatusChanged(notifyUserId, {
-                    taskId: task.id,
-                    oldStatus,
-                    newStatus,
-                    changedBy: userId,
-                    changedAt: history.changedAt
-                });
+                const actorName = `${user.firstName} ${user.lastName}`.trim() || user.phoneNumber;
+
+                await this.notificationsService.createNotification(
+                    notifyUserId,
+                    NotificationType.TASK_STATUS_CHANGED,
+                    `"${task.template.title}" topshirig'i holati ${actorName} tomonidan "${statusLabel}" holatiga o'zgardi`,
+                    { taskId: task.id }
+                );
 
                 return task;
             }
@@ -307,19 +308,15 @@ export class TasksService {
                 }
             });
 
-            // Notification
-            await manager.save(Notification, {
-                userId: task.assignedTo,
-                type: NotificationType.TASK_VERIFIED,
-                message: `Task verified by director`
-            });
+            // Notification & Socket & Web Push
+            const actorName = `${director.firstName} ${director.lastName}`.trim() || director.phoneNumber;
 
-
-            // Socket event
-            this.gateway.emitTaskVerified(task.assignedTo, {
-                taskId: task.id,
-                status: TaskStatus.DONE
-            });
+            await this.notificationsService.createNotification(
+                task.assignedTo,
+                NotificationType.TASK_VERIFIED,
+                `"${task.template.title}" topshirig'i direktor (${actorName}) tomonidan tasdiqlandi`,
+                { taskId: task.id }
+            );
 
             return task;
 
@@ -374,18 +371,16 @@ export class TasksService {
                 }
             });
 
-            // NOtification
-            await manager.save(Notification, {
-                userId: task.assignedTo,
-                type: NotificationType.TASK_REJECTED,
-                message: `Task rejected by director`
-            });
+            // Notification & Socket & Web Push
+            const director = await this.usersRepo.findOne({ where: { id: directorId } });
+            const actorName = director ? `${director.firstName} ${director.lastName}`.trim() || director.phoneNumber : "Direktor";
 
-            // Socket
-            this.gateway.emitTaskStatusChanged(task.assignedTo, {
-                taskId: task.id,
-                status: TaskStatus.REJECTED
-            });
+            await this.notificationsService.createNotification(
+                task.assignedTo,
+                NotificationType.TASK_REJECTED,
+                `"${task.template.title}" topshirig'i direktor (${actorName}) tomonidan rad etildi`,
+                { taskId: task.id }
+            );
 
             return task;
         });
