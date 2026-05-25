@@ -200,6 +200,46 @@ export class ClientsService {
         });
     }
 
+    async deletePayment(paymentId: string, user: AuthenticatedUser): Promise<void> {
+        return this.dataSource.transaction(async (manager) => {
+            const payment = await manager.findOne(Payment, { 
+                where: { id: paymentId },
+                relations: { client: true }
+            });
+            if (!payment) throw new NotFoundException('Payment not found');
+
+            const client = payment.client;
+            await manager.remove(Payment, payment);
+
+            // Recalculate sale status
+            if (client.saleTotalAmount) {
+                const allPayments = await manager.find(Payment, { where: { clientId: client.id } });
+                const totalPaid = allPayments.reduce((sum, p) => sum + p.amount, 0);
+
+                if (totalPaid >= client.saleTotalAmount) {
+                    client.saleStatus = SaleStatus.FULL;
+                } else {
+                    client.saleStatus = SaleStatus.PARTIAL;
+                }
+                await manager.save(client);
+            }
+
+            // Fetch fully populated client for gateway emission
+            const updatedClient = await manager.findOne(Client, { 
+                where: { id: client.id }, 
+                relations: { department: true, notes: true, payments: true } 
+            });
+
+            this.clientsGateway.emitClientUpdate(client.id, updatedClient);
+
+            await manager.save(ActivityLog, {
+                userId: user.id || undefined,
+                actionType: 'CLIENT_PAYMENT_DELETED',
+                details: { clientId: client.id, amount: payment.amount, paymentId }
+            });
+        });
+    }
+
     async setSale(clientId: string, dto: SetSaleDto, user?: AuthenticatedUser): Promise<Client> {
         const client = await this.findOne(clientId);
         client.saleStatus = dto.status;
@@ -248,7 +288,7 @@ export class ClientsService {
 
         for (const client of callReminders) {
             this.clientsGateway.emitReminder(client.id, client.fullName);
-            
+
             // Create persistent notification for the current call handler
             if (client.inCallByEmployeeId) {
                 await this.notificationsService.createNotification(
@@ -283,7 +323,7 @@ export class ClientsService {
 
         for (const client of paymentReminders) {
             this.clientsGateway.emitPaymentReminder(client.id, client.fullName);
-            
+
             // Create persistent notification
             if (client.inCallByEmployeeId) {
                 await this.notificationsService.createNotification(

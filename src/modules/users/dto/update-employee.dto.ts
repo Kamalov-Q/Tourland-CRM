@@ -32,4 +32,14 @@ export class UpdateEmployeeDto {
     @IsOptional()
     @IsBoolean()
     isActive?: boolean;
+
+    @ApiProperty({ description: 'Can access departments', required: false, example: true })
+    @IsOptional()
+    @IsBoolean()
+    canAccessDepartments?: boolean;
+
+    @ApiProperty({ description: 'Can access forms', required: false, example: true })
+    @IsOptional()
+    @IsBoolean()
+    canAccessForms?: boolean;
 }

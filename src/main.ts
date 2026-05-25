@@ -6,6 +6,7 @@ import { RedisIoAdapter } from './adapters/redis-io.adapter';
 import { ConfigService } from '@nestjs/config';
 
 async function bootstrap() {
+  process.env.TZ = 'Asia/Tashkent';
   const app = await NestFactory.create(AppModule);
   app.enableCors({
     origin: '*',

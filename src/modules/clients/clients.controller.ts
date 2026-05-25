@@ -12,11 +12,14 @@ import type { AuthenticatedUser } from 'src/common/types/auth-request.type';
 import { ClientStage } from './enums/client.enums';
 
 import { UserActiveGuard } from '../../common/guards/user-active.guard';
+import { ModuleAccessGuard } from '../../common/guards/module-access.guard';
+import { CheckModuleAccess } from '../../common/decorators/module-access.decorator';
 
 @ApiTags('Clients')
 @ApiBearerAuth()
 @Controller('clients')
-@UseGuards(JwtAuthGuard, RolesGuard, UserActiveGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, UserActiveGuard, ModuleAccessGuard)
+@CheckModuleAccess('departments')
 export class ClientsController {
     constructor(private readonly clientsService: ClientsService) { }
 
@@ -91,6 +94,17 @@ export class ClientsController {
         @CurrentUser() user: AuthenticatedUser,
     ) {
         return this.clientsService.addPayment(id, dto, user as AuthenticatedUser);
+    }
+
+    @Delete('payments/:paymentId')
+    @Roles(UserRole.DIRECTOR, UserRole.EMPLOYEE)
+    @HttpCode(HttpStatus.NO_CONTENT)
+    @ApiOperation({ summary: 'Delete a payment' })
+    async deletePayment(
+        @Param('paymentId') paymentId: string,
+        @CurrentUser() user: AuthenticatedUser,
+    ) {
+        await this.clientsService.deletePayment(paymentId, user as AuthenticatedUser);
     }
 
     @Patch(':id/sale')

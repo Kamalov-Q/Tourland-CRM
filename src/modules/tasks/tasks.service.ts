@@ -83,19 +83,19 @@ export class TasksService {
         const saved = await this.templateRepo.save(template);
 
         const tzDateStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tashkent' });
-        const todayDate = new Date(`${tzDateStr}T00:00:00.000Z`);
+        const todayDate = new Date(`${tzDateStr}T00:00:00.000`);
 
-        const startDay = new Date(`${dto.startDate}T00:00:00.000Z`);
-        const endDay = new Date(`${dto.endDate}T23:59:59.999Z`);
+        const startDay = new Date(`${dto.startDate}T00:00:00.000`);
+        const endDay = new Date(`${dto.endDate}T23:59:59.999`);
         
-        const todayStart = new Date(`${tzDateStr}T00:00:00.000Z`);
+        const todayStart = new Date(`${tzDateStr}T00:00:00.000`);
 
         let currentDay = new Date(startDay);
         const instancesToCreate: any[] = [];
         while (currentDay <= endDay) {
             const dateStr = currentDay.toISOString().split('T')[0];
-            const tempStart = new Date(`${dateStr}T00:00:00.000Z`);
-            const expires = new Date(`${dateStr}T23:59:59.999Z`);
+            const tempStart = new Date(`${dateStr}T00:00:00.000`);
+            const expires = new Date(`${dateStr}T23:59:59.999`);
 
             instancesToCreate.push({
                 templateId: saved.id,
@@ -400,7 +400,7 @@ export class TasksService {
 
     async markPastTasksIncomplete() {
         const tzDateStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tashkent' });
-        const today = new Date(`${tzDateStr}T00:00:00.000Z`);
+        const today = new Date(`${tzDateStr}T00:00:00.000`);
 
         const expired = await this.taskRepo.find({
             where: {
@@ -420,7 +420,7 @@ export class TasksService {
         await this.markPastTasksIncomplete();
 
         const tzDateStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tashkent' });
-        const today = new Date(`${tzDateStr}T00:00:00.000Z`);
+        const today = new Date(`${tzDateStr}T00:00:00.000`);
 
         const tasks = await this.taskRepo.find({
             where: {
@@ -453,7 +453,7 @@ export class TasksService {
         await this.markPastTasksIncomplete();
 
         const tzDateStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tashkent' });
-        const today = new Date(`${tzDateStr}T00:00:00.000Z`);
+        const today = new Date(`${tzDateStr}T00:00:00.000`);
 
         return this.taskRepo.find({
             relations: ['template'],

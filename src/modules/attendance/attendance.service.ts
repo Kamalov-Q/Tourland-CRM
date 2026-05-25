@@ -58,11 +58,20 @@ export class AttendanceService {
         return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tashkent' });
     }
 
-    /** Round check-in time: minutes < 30 → floor to hour, minutes >= 30 → ceil to next hour */
-    private roundCheckInTime(date: Date): Date {
+    /** 
+     * Round attendance time (check-in/out): 
+     * 00-20 (inc) -> current hour :00
+     * 21-45 (inc) -> current hour :30
+     * 46-59 -> next hour :00
+     */
+    private roundAttendanceTime(date: Date): Date {
         const rounded = new Date(date);
-        if (date.getMinutes() < 30) {
+        const minutes = date.getMinutes();
+        
+        if (minutes <= 20) {
             rounded.setMinutes(0, 0, 0);
+        } else if (minutes <= 45) {
+            rounded.setMinutes(30, 0, 0);
         } else {
             rounded.setHours(date.getHours() + 1, 0, 0, 0);
         }
@@ -82,7 +91,7 @@ export class AttendanceService {
         const attendance = this.attendanceRepo.create({
             employeeId,
             date,
-            checkInAt: this.roundCheckInTime(new Date()),
+            checkInAt: this.roundAttendanceTime(new Date()),
             photo: photoUrl,
             status: AttendanceStatus.PRESENT,
         });
@@ -128,7 +137,7 @@ export class AttendanceService {
 
         const photoUrl = dto.photo ? await this.savePhoto(dto.photo) : null;
 
-        attendance.checkOutAt = new Date();
+        attendance.checkOutAt = this.roundAttendanceTime(new Date());
         attendance.checkOutPhoto = photoUrl;
         attendance.status = AttendanceStatus.ATTENDED;
 
@@ -178,22 +187,23 @@ export class AttendanceService {
 
         if (active.length === 0) return;
 
-        // Build the 19:00 timestamp for today in Tashkent time
+        // Build the 20:00 timestamp for today in Tashkent time
         const checkoutTime = new Date();
-        checkoutTime.setHours(19, 0, 0, 0);
+        checkoutTime.setHours(20, 0, 0, 0);
 
         const defaultPhoto = '/uploads/attendance/default.jpg';
 
         for (const rec of active) {
             rec.checkOutAt = checkoutTime;
             rec.checkOutPhoto = defaultPhoto;
+            rec.isAutoCheckout = true;
             rec.status = AttendanceStatus.ATTENDED;
             await this.attendanceRepo.save(rec);
 
             await this.activityRepo.save({
                 userId: rec.employeeId,
                 actionType: 'ATTENDANCE_AUTO_CHECKOUT',
-                details: { attendanceId: rec.id, note: 'Auto-checked out at 19:00' }
+                details: { attendanceId: rec.id, note: 'Auto-checked out at 20:00' }
             });
 
             // Notify director
@@ -214,7 +224,7 @@ export class AttendanceService {
             }
         }
 
-        this.logger.log(`Auto-checked out ${active.length} employee(s) at 19:00`);
+        this.logger.log(`Auto-checked out ${active.length} employee(s) at 20:00`);
     }
 
     /**
@@ -248,7 +258,7 @@ export class AttendanceService {
                 await this.activityRepo.save({
                     userId: emp.id,
                     actionType: 'ATTENDANCE_ABSENT',
-                    details: { date, note: 'Marked absent by system at 19:00' }
+                    details: { date, note: 'Marked absent by system at 20:00' }
                 });
 
                 this.logger.log(`Marked ${emp.firstName} ${emp.lastName} as ABSENT for ${date}`);

@@ -1,4 +1,4 @@
-import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn } from "typeorm";
+import { BeforeInsert, Column, Entity, Index, PrimaryGeneratedColumn } from "typeorm";
 import { NotificationType } from "../enums/notification-type.enum";
 
 @Entity('notifications')
@@ -32,7 +32,14 @@ export class Notification {
     })
     data?: any;
 
-    @CreateDateColumn()
+    @Column({
+        type: 'timestamp',
+        default: () => 'CURRENT_TIMESTAMP'
+    })
     createdAt: Date;
 
+    @BeforeInsert()
+    setCreatedAt() {
+        this.createdAt = new Date();
+    }
 }

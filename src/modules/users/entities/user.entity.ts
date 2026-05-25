@@ -46,6 +46,12 @@ export class User {
     @Column({ default: true })
     isActive: boolean;
 
+    @Column({ default: true })
+    canAccessDepartments: boolean;
+
+    @Column({ default: true })
+    canAccessForms: boolean;
+
     @Column({ type: 'text', nullable: true, select: false })
     refreshToken: string | null;
 

@@ -35,12 +35,14 @@ export class AuthService {
         const payload: JwtPayload = {
             sub: user.id,
             phoneNumber: user.phoneNumber,
-            role: user.role
+            role: user.role,
+            canAccessDepartments: user.canAccessDepartments,
+            canAccessForms: user.canAccessForms
         }
 
         const [accessToken, refreshToken] = await Promise.all([
             this.jwtSvc.signAsync(payload),
-            this.jwtSvc.signAsync(payload, { expiresIn: '7d' }) // Refresh token lasts longer
+            this.jwtSvc.signAsync(payload, { expiresIn: '7d' })
         ]);
 
         await this.usersSvc.updateRefreshToken(user.id, refreshToken);
@@ -80,7 +82,9 @@ export class AuthService {
             const newPayload: JwtPayload = {
                 sub: user.id,
                 phoneNumber: user.phoneNumber,
-                role: user.role
+                role: user.role,
+                canAccessDepartments: user.canAccessDepartments,
+                canAccessForms: user.canAccessForms
             };
 
             const [accessToken, newRefreshToken] = await Promise.all([

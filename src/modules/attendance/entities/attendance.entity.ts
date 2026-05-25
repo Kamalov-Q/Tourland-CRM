@@ -3,7 +3,7 @@ import { User } from "../../users/entities/user.entity";
 
 export enum AttendanceStatus {
     PRESENT = 'PRESENT',   // Currently at work (checked in, not yet checked out)
-    ATTENDED = 'ATTENDED', // Completed the day (checked out, including auto-checkout at 7 PM)
+    ATTENDED = 'ATTENDED', // Completed the day (checked out, including auto-checkout)
     ABSENT = 'ABSENT',     // Never showed up
 }
 
@@ -40,6 +40,9 @@ export class Attendance {
         default: AttendanceStatus.PRESENT,
     })
     status: AttendanceStatus;
+
+    @Column({ default: false })
+    isAutoCheckout: boolean;
 
     @CreateDateColumn()
     createdAt: Date;

@@ -5,6 +5,8 @@ export interface JwtPayload {
     sub: string;
     phoneNumber: string;
     role: UserRole;
+    canAccessDepartments?: boolean;
+    canAccessForms?: boolean;
 }
 
 export interface AuthenticatedUser {
@@ -14,6 +16,8 @@ export interface AuthenticatedUser {
     lastName: string;
     role: UserRole;
     isActive: boolean;
+    canAccessDepartments: boolean;
+    canAccessForms: boolean;
 }
 
 export interface AuthenticatedRequest extends Request {

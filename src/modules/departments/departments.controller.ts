@@ -9,11 +9,14 @@ import { UpdateDepartmentDto } from './dto/update-department.dto';
 import { DepartmentsService } from './departments.service';
 
 import { UserActiveGuard } from '../../common/guards/user-active.guard';
+import { ModuleAccessGuard } from '../../common/guards/module-access.guard';
+import { CheckModuleAccess } from '../../common/decorators/module-access.decorator';
 
 @ApiTags('Departments')
 @ApiBearerAuth()
 @Controller('departments')
-@UseGuards(JwtAuthGuard, RolesGuard, UserActiveGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, UserActiveGuard, ModuleAccessGuard)
+@CheckModuleAccess('departments')
 export class DepartmentsController {
     constructor(private readonly departmentsService: DepartmentsService) { }
 

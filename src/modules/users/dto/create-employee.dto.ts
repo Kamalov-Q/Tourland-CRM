@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsString, MinLength } from 'class-validator';
+import { IsBoolean, IsNotEmpty, IsOptional, IsString, MinLength } from 'class-validator';
 
 
 export class CreateEmployeeDto {
@@ -25,5 +25,15 @@ export class CreateEmployeeDto {
     @IsString()
     @MinLength(6)
     password: string;
+
+    @ApiProperty({ description: 'Can access departments', required: false, example: true })
+    @IsOptional()
+    @IsBoolean()
+    canAccessDepartments?: boolean;
+
+    @ApiProperty({ description: 'Can access forms', required: false, example: true })
+    @IsOptional()
+    @IsBoolean()
+    canAccessForms?: boolean;
 
 }

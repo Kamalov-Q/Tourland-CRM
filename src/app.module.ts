@@ -30,8 +30,8 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
       password: configSvc.getOrThrow<string>('DATABASE_PASSWORD'),
       database: configSvc.getOrThrow<string>('DATABASE_NAME'),
       autoLoadEntities: true,
-      // TODO: Later in production set it to NODE_ENV !== 'production'
-      synchronize: true
+      synchronize: true,
+      timezone: '+05:00'
     })
   }),
   BullModule.forRootAsync({

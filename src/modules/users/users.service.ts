@@ -90,7 +90,9 @@ export class UsersService {
             phoneNumber: dto.phoneNumber,
             password: await bcrypt.hash(dto.password, 10),
             role: UserRole.EMPLOYEE,
-            parentId: director.id
+            parentId: director.id,
+            canAccessDepartments: dto.canAccessDepartments ?? true,
+            canAccessForms: dto.canAccessForms ?? true,
         });
 
         const saved = await this.userRepo.save(employee);
@@ -180,6 +182,14 @@ export class UsersService {
 
         if (dto.isActive !== undefined) {
             employee.isActive = dto.isActive;
+        }
+
+        if (dto.canAccessDepartments !== undefined) {
+            employee.canAccessDepartments = dto.canAccessDepartments;
+        }
+
+        if (dto.canAccessForms !== undefined) {
+            employee.canAccessForms = dto.canAccessForms;
         }
 
         const saved = await this.userRepo.save(employee);

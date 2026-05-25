@@ -57,14 +57,14 @@ export class TasksProcessor extends WorkerHost {
         if (!employee?.isActive) return;
 
         const tzDateStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tashkent' });
-        const today = new Date(`${tzDateStr}T00:00:00.000Z`);
+        const today = new Date(`${tzDateStr}T00:00:00.000`);
 
         // Safely extract YYYY-MM-DD from typeorm timestamp assuming UTC naive parsing
         const startStr = new Date(template.startDate).toISOString().split('T')[0];
-        const startDay = new Date(`${startStr}T00:00:00.000Z`);
+        const startDay = new Date(`${startStr}T00:00:00.000`);
 
         const endStr = new Date(template.endDate).toISOString().split('T')[0];
-        const endDay = new Date(`${endStr}T23:59:59.999Z`);
+        const endDay = new Date(`${endStr}T23:59:59.999`);
 
         if (today < startDay || today > endDay) {
             return;

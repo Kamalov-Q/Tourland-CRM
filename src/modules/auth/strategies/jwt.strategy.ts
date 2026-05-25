@@ -31,7 +31,9 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
             firstName: user.firstName,
             lastName: user.lastName,
             role: user.role,
-            isActive: user.isActive
+            isActive: user.isActive,
+            canAccessDepartments: user.canAccessDepartments,
+            canAccessForms: user.canAccessForms
         }
     }
 }

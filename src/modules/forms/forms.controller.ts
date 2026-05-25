@@ -9,6 +9,8 @@ import { UserRole } from 'src/modules/users/entities/user.entity';
 import { SubmitFormDto } from './dto/submit-form.dto';
 
 import { UserActiveGuard } from 'src/common/guards/user-active.guard';
+import { ModuleAccessGuard } from 'src/common/guards/module-access.guard';
+import { CheckModuleAccess } from 'src/common/decorators/module-access.decorator';
 
 @ApiTags('Forms')
 @Controller('forms')
@@ -27,7 +29,8 @@ export class FormsController {
     return this.formsService.submitForm(id, body.data);
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ModuleAccessGuard)
+  @CheckModuleAccess('forms')
   @ApiBearerAuth()
   @Get()
   @ApiOperation({ summary: 'List all form templates' })
@@ -35,7 +38,8 @@ export class FormsController {
     return this.formsService.findAll();
   }
 
-  @UseGuards(JwtAuthGuard, RolesGuard, UserActiveGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, UserActiveGuard, ModuleAccessGuard)
+  @CheckModuleAccess('forms')
   @ApiBearerAuth()
   @Roles(UserRole.DIRECTOR, UserRole.EMPLOYEE)
   @Post()
@@ -44,7 +48,8 @@ export class FormsController {
     return this.formsService.create(dto);
   }
 
-  @UseGuards(JwtAuthGuard, RolesGuard, UserActiveGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, UserActiveGuard, ModuleAccessGuard)
+  @CheckModuleAccess('forms')
   @ApiBearerAuth()
   @Roles(UserRole.DIRECTOR, UserRole.EMPLOYEE)
   @Patch(':id')
@@ -53,7 +58,8 @@ export class FormsController {
     return this.formsService.update(id, dto);
   }
 
-  @UseGuards(JwtAuthGuard, RolesGuard, UserActiveGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, UserActiveGuard, ModuleAccessGuard)
+  @CheckModuleAccess('forms')
   @ApiBearerAuth()
   @Roles(UserRole.DIRECTOR, UserRole.EMPLOYEE)
   @Delete(':id')
