@@ -83,19 +83,23 @@ export class TasksService {
         const saved = await this.templateRepo.save(template);
 
         const tzDateStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tashkent' });
-        const todayDate = new Date(`${tzDateStr}T00:00:00.000`);
+        const todayDate = new Date(tzDateStr);
+        todayDate.setHours(0, 0, 0, 0);
 
         const startDay = new Date(`${dto.startDate}T00:00:00.000`);
         const endDay = new Date(`${dto.endDate}T23:59:59.999`);
         
-        const todayStart = new Date(`${tzDateStr}T00:00:00.000`);
+        const todayStart = new Date(tzDateStr);
+        todayStart.setHours(0, 0, 0, 0);
 
         let currentDay = new Date(startDay);
         const instancesToCreate: any[] = [];
         while (currentDay <= endDay) {
             const dateStr = currentDay.toISOString().split('T')[0];
-            const tempStart = new Date(`${dateStr}T00:00:00.000`);
-            const expires = new Date(`${dateStr}T23:59:59.999`);
+            const tempStart = new Date(dateStr);
+            tempStart.setHours(0, 0, 0, 0);
+            const expires = new Date(dateStr);
+            expires.setHours(23, 59, 59, 999);
 
             instancesToCreate.push({
                 templateId: saved.id,

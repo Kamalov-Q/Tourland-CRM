@@ -38,7 +38,7 @@ export class AttendanceService {
     private async savePhoto(base64: string): Promise<string> {
         const matches = base64.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
         if (!matches || matches.length !== 3) {
-            throw new BadRequestException('Invalid photo format — expected base64 data URI');
+            throw new BadRequestException('Surat formati noto\'g\'ri — kutilayotgan base64 data URI');
         }
 
         const buffer = Buffer.from(matches[2], 'base64');
@@ -48,7 +48,7 @@ export class AttendanceService {
         try {
             await fs.writeFile(filePath, buffer);
         } catch {
-            throw new BadRequestException('Failed to save photo');
+            throw new BadRequestException('Suratni saqlashda xatolik');
         }
 
         return `/uploads/attendance/${fileName}`;
@@ -65,6 +65,8 @@ export class AttendanceService {
      * 46-59 -> next hour :00
      */
     private roundAttendanceTime(date: Date): Date {
+        // Since process.env.TZ = 'Asia/Tashkent', raw Date methods are safe here for the backend.
+        // But for clarity, we ensure we are working with correct local time.
         const rounded = new Date(date);
         const minutes = date.getMinutes();
         
@@ -83,7 +85,7 @@ export class AttendanceService {
         const exists = await this.attendanceRepo.findOne({ where: { employeeId, date } });
 
         if (exists) {
-            throw new BadRequestException('Already checked in today');
+            throw new BadRequestException('Bugun allaqachon ishga kelgansiz');
         }
 
         const photoUrl = await this.savePhoto(dto.photo);
@@ -128,11 +130,11 @@ export class AttendanceService {
         const attendance = await this.attendanceRepo.findOne({ where: { employeeId, date } });
 
         if (!attendance) {
-            throw new BadRequestException('Must check in before checking out');
+            throw new BadRequestException('Ishdan ketishdan oldin ishga kelishni qayd eting');
         }
 
         if (attendance.checkOutAt) {
-            throw new BadRequestException('Already checked out today');
+            throw new BadRequestException('Bugun allaqachon ishdan ketgansiz');
         }
 
         const photoUrl = dto.photo ? await this.savePhoto(dto.photo) : null;
@@ -188,7 +190,8 @@ export class AttendanceService {
         if (active.length === 0) return;
 
         // Build the 20:00 timestamp for today in Tashkent time
-        const checkoutTime = new Date();
+        const tzDateStr = this.getTodayStr(); // YYYY-MM-DD in Tashkent
+        const checkoutTime = new Date(tzDateStr);
         checkoutTime.setHours(20, 0, 0, 0);
 
         const defaultPhoto = '/uploads/attendance/default.jpg';
@@ -203,7 +206,7 @@ export class AttendanceService {
             await this.activityRepo.save({
                 userId: rec.employeeId,
                 actionType: 'ATTENDANCE_AUTO_CHECKOUT',
-                details: { attendanceId: rec.id, note: 'Auto-checked out at 20:00' }
+                details: { attendanceId: rec.id, note: '20:00 da avtomatik checkout' }
             });
 
             // Notify director
@@ -258,7 +261,7 @@ export class AttendanceService {
                 await this.activityRepo.save({
                     userId: emp.id,
                     actionType: 'ATTENDANCE_ABSENT',
-                    details: { date, note: 'Marked absent by system at 20:00' }
+                    details: { date, note: 'Sistema tomonidan 20:00 da kelmagan deb belgilandi' }
                 });
 
                 this.logger.log(`Marked ${emp.firstName} ${emp.lastName} as ABSENT for ${date}`);

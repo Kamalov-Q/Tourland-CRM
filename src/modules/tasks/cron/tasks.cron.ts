@@ -34,8 +34,12 @@ export class TasksCron {
         const currentTime = now.toLocaleTimeString('en-GB', { timeZone: 'Asia/Tashkent', hour: '2-digit', minute: '2-digit' });
 
         const tzDateStr = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Tashkent' });
-        const todayStart = new Date(`${tzDateStr}T00:00:00.000`);
-        const todayEnd = new Date(`${tzDateStr}T23:59:59.999`);
+        // Set hours in a way that respects the system's TZ (which is Asia/Tashkent)
+        const todayStart = new Date(tzDateStr);
+        todayStart.setHours(0, 0, 0, 0);
+        
+        const todayEnd = new Date(tzDateStr);
+        todayEnd.setHours(23, 59, 59, 999);
 
         // Only active templates
         const templates = await this.templateRepo.find({
@@ -74,7 +78,8 @@ export class TasksCron {
     async incompleteTasksCron() {
 
         const tzDateStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tashkent' });
-        const today = new Date(`${tzDateStr}T00:00:00.000`);
+        const today = new Date(tzDateStr);
+        today.setHours(0, 0, 0, 0);
 
         const tasks = await this.taskRepo.find({
             where: {

@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { CreateClientDto } from './dto/create-client.dto';
@@ -15,9 +15,12 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationType } from '../notifications/enums/notification-type.enum';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { LessThanOrEqual, IsNull } from 'typeorm';
+import { User } from '../users/entities/user.entity';
 
 @Injectable()
 export class ClientsService {
+    private readonly logger = new Logger(ClientsService.name);
+
     constructor(
         @InjectRepository(Client)
         private readonly clientRepo: Repository<Client>,
@@ -33,6 +36,9 @@ export class ClientsService {
 
         @InjectRepository(ActivityLog)
         private readonly activityRepo: Repository<ActivityLog>,
+
+        @InjectRepository(User)
+        private readonly userRepo: Repository<User>,
 
         private readonly clientsGateway: ClientsGateway,
 
@@ -275,6 +281,14 @@ export class ClientsService {
         return saved;
     }
 
+    /**
+     * Helper: get all user IDs to notify (director + all employees).
+     */
+    private async getAllUserIds(): Promise<string[]> {
+        const users = await this.userRepo.find({ select: ['id'] });
+        return users.map(u => u.id);
+    }
+
     @Cron(CronExpression.EVERY_MINUTE)
     async handleReminders() {
         const now = new Date();
@@ -289,7 +303,7 @@ export class ClientsService {
         for (const client of callReminders) {
             this.clientsGateway.emitReminder(client.id, client.fullName);
 
-            // Create persistent notification for the current call handler
+            // Notify the in-call employee specifically
             if (client.inCallByEmployeeId) {
                 await this.notificationsService.createNotification(
                     client.inCallByEmployeeId,
@@ -316,26 +330,41 @@ export class ClientsService {
                 {
                     saleStatus: SaleStatus.PARTIAL,
                     nextPaymentAt: LessThanOrEqual(now),
-                    lastPaymentNotifiedAt: LessThanOrEqual(tenMinsAgo) // Notified > 10 mins ago
+                    lastPaymentNotifiedAt: LessThanOrEqual(tenMinsAgo)
                 }
             ]
         });
 
-        for (const client of paymentReminders) {
-            this.clientsGateway.emitPaymentReminder(client.id, client.fullName);
+        if (paymentReminders.length > 0) {
+            // Fetch all user IDs once for broadcasting
+            const allUserIds = await this.getAllUserIds();
 
-            // Create persistent notification
-            if (client.inCallByEmployeeId) {
-                await this.notificationsService.createNotification(
-                    client.inCallByEmployeeId,
-                    NotificationType.CLIENT_PAYMENT,
-                    `Mijoz ${client.fullName} uchun to'lov eslatmasi`,
-                    { clientId: client.id }
-                );
+            for (const client of paymentReminders) {
+                // Broadcast socket event to everyone
+                this.clientsGateway.emitPaymentReminder(client.id, client.fullName);
+
+                const isFirstNotification = !client.lastPaymentNotifiedAt;
+                const message = isFirstNotification
+                    ? `Mijoz ${client.fullName} uchun to'lov vaqti keldi`
+                    : `Mijoz ${client.fullName} uchun to'lov hali amalga oshirilmagan`;
+
+                // Send persistent notification to ALL users (director + employees)
+                for (const userId of allUserIds) {
+                    try {
+                        await this.notificationsService.createNotification(
+                            userId,
+                            NotificationType.CLIENT_PAYMENT,
+                            message,
+                            { clientId: client.id, clientName: client.fullName }
+                        );
+                    } catch (err) {
+                        this.logger.error(`Failed to notify user ${userId} for payment reminder: ${err.message}`);
+                    }
+                }
+
+                client.lastPaymentNotifiedAt = now;
+                await this.clientRepo.save(client);
             }
-
-            client.lastPaymentNotifiedAt = now;
-            await this.clientRepo.save(client);
         }
     }
 }

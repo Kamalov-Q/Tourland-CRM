@@ -9,9 +9,10 @@ import { Department } from '../departments/entites/department.entity';
 import { ActivityLog } from '../archive/entities/activity-log.entity';
 import { ClientsGateway } from './gateways/clients.gateway';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { User } from '../users/entities/user.entity';
 
 @Module({
-    imports: [TypeOrmModule.forFeature([Client, ClientNote, Payment, Department, ActivityLog]), NotificationsModule],
+    imports: [TypeOrmModule.forFeature([Client, ClientNote, Payment, Department, ActivityLog, User]), NotificationsModule],
     controllers: [ClientsController],
     providers: [ClientsService, ClientsGateway],
 })
