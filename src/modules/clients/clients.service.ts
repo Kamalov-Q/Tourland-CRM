@@ -91,7 +91,7 @@ export class ClientsService {
         return client;
     }
 
-    async update(id: string, dto: UpdateClientDto): Promise<Client> {
+    async update(id: string, dto: UpdateClientDto, user: AuthenticatedUser): Promise<Client> {
         const client = await this.findOne(id);
         if (dto.departmentId && dto.departmentId !== client.departmentId) {
             const dep = await this.departmentRepo.findOne({ where: { id: dto.departmentId } });
@@ -105,6 +105,16 @@ export class ClientsService {
             client.inCallByName = null;
             client.callStartedAt = null;
             this.clientsGateway.emitCallEnded(client.id);
+        }
+
+        // Reset notification timer if stage changes
+        if (dto.stage) {
+            client.lastCallReminderNotifiedAt = null;
+        }
+
+        // Track who set the reminder or who is responsible for no-answer follow-up
+        if (dto.remindAt || dto.stage === ClientStage.NO_ANSWER) {
+            client.remindEmployeeId = user.id;
         }
 
         const saved = await this.clientRepo.save(client);
@@ -255,6 +265,7 @@ export class ClientsService {
             client.nextPaymentAt = dto.nextPaymentAt ? new Date(dto.nextPaymentAt) : null;
         }
         if (dto.status !== SaleStatus.NONE) {
+            client.soldByEmployeeId = user?.id || null;
             client.soldAt = new Date();
             client.stage = ClientStage.SOLD;
             client.inCallByEmployeeId = null;
@@ -303,17 +314,19 @@ export class ClientsService {
         for (const client of callReminders) {
             this.clientsGateway.emitReminder(client.id, client.fullName);
 
-            // Notify the in-call employee specifically
-            if (client.inCallByEmployeeId) {
+            // Notify the specific employee who set the reminder
+            const targetEmployeeId = client.remindEmployeeId || client.inCallByEmployeeId;
+            if (targetEmployeeId) {
                 await this.notificationsService.createNotification(
-                    client.inCallByEmployeeId,
+                    targetEmployeeId,
                     NotificationType.CLIENT_REMINDER,
-                    `Mijoz ${client.fullName} uchun eslatma vaqti keldi`,
+                    `🔔 Mijoz ${client.fullName} uchun qo'ng'iroq eslatmasi vaqti keldi`,
                     { clientId: client.id }
                 );
             }
 
             client.remindAt = null;
+            client.remindEmployeeId = null; // Clear after notifying
             await this.clientRepo.save(client);
         }
 
@@ -336,33 +349,72 @@ export class ClientsService {
         });
 
         if (paymentReminders.length > 0) {
-            // Fetch all user IDs once for broadcasting
-            const allUserIds = await this.getAllUserIds();
-
             for (const client of paymentReminders) {
-                // Broadcast socket event to everyone
+                // Broadcast socket event to everyone (still useful for real-time UI)
                 this.clientsGateway.emitPaymentReminder(client.id, client.fullName);
 
                 const isFirstNotification = !client.lastPaymentNotifiedAt;
                 const message = isFirstNotification
-                    ? `Mijoz ${client.fullName} uchun to'lov vaqti keldi`
-                    : `Mijoz ${client.fullName} uchun to'lov hali amalga oshirilmagan`;
+                    ? `💰 Mijoz ${client.fullName} uchun to'lov vaqti keldi`
+                    : `💸 Mijoz ${client.fullName} uchun to'lov hali amalga oshirilmagan`;
 
-                // Send persistent notification to ALL users (director + employees)
-                for (const userId of allUserIds) {
+                // Notify ONLY the employee who made the sale (targeted)
+                if (client.soldByEmployeeId) {
                     try {
                         await this.notificationsService.createNotification(
-                            userId,
+                            client.soldByEmployeeId,
                             NotificationType.CLIENT_PAYMENT,
                             message,
                             { clientId: client.id, clientName: client.fullName }
                         );
                     } catch (err) {
-                        this.logger.error(`Failed to notify user ${userId} for payment reminder: ${err.message}`);
+                        this.logger.error(`Failed to notify seller ${client.soldByEmployeeId} for payment reminder: ${err.message}`);
                     }
                 }
 
                 client.lastPaymentNotifiedAt = now;
+                await this.clientRepo.save(client);
+            }
+        }
+
+        // 3. Persistent "Ko'tarmadi" (No Answer) Reminders
+        // Notify every 60 minutes if still in "no_answer"
+        const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+        const noAnswerReminders = await this.clientRepo.find({
+            where: [
+                {
+                    stage: ClientStage.NO_ANSWER,
+                    lastCallReminderNotifiedAt: IsNull(),
+                    updatedAt: LessThanOrEqual(oneHourAgo)
+                },
+                {
+                    stage: ClientStage.NO_ANSWER,
+                    lastCallReminderNotifiedAt: LessThanOrEqual(oneHourAgo)
+                }
+            ]
+        });
+
+        for (const client of noAnswerReminders) {
+            const targetEmployeeId = client.remindEmployeeId || client.inCallByEmployeeId || client.soldByEmployeeId;
+            if (targetEmployeeId) {
+                try {
+                    await this.notificationsService.createNotification(
+                        targetEmployeeId,
+                        NotificationType.CLIENT_REMINDER,
+                        `⏳ Mijoz "${client.fullName}" bilan qayta bog'lanish vaqti keldi. Iltimos, qayta bog'lanishga harakat qiling!`,
+                        { clientId: client.id, type: 'persistent_reminder' }
+                    );
+                    
+                    // Only update timestamp if notification was successful
+                    client.lastCallReminderNotifiedAt = now;
+                    await this.clientRepo.save(client);
+                } catch (err) {
+                    this.logger.error(`Failed to notify for persistent no-answer reminder: ${err.message}`);
+                }
+            } else {
+                // If no target, update anyway to prevent query loop, but log it
+                this.logger.warn(`No target employee found for persistent reminder on client ${client.id}`);
+                client.lastCallReminderNotifiedAt = now;
                 await this.clientRepo.save(client);
             }
         }

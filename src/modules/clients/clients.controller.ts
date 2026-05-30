@@ -51,8 +51,12 @@ export class ClientsController {
     @Patch(':id')
     @Roles(UserRole.DIRECTOR, UserRole.EMPLOYEE)
     @ApiOperation({ summary: 'Update client details or stage' })
-    update(@Param('id') id: string, @Body() dto: UpdateClientDto) {
-        return this.clientsService.update(id, dto);
+    update(
+        @Param('id') id: string, 
+        @Body() dto: UpdateClientDto,
+        @CurrentUser() user: AuthenticatedUser,
+    ) {
+        return this.clientsService.update(id, dto, user as AuthenticatedUser);
     }
 
     @Delete(':id')

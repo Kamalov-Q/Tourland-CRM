@@ -55,6 +55,9 @@ export class User {
     @Column({ type: 'text', nullable: true, select: false })
     refreshToken: string | null;
 
+    @Column({ type: 'varchar', unique: true, nullable: true })
+    telegramId: string | null;
+
     @CreateDateColumn()
     createdAt: Date;
 

@@ -53,10 +53,19 @@ export class Client {
     soldByName: string | null;
 
     @Column({ type: 'timestamp', nullable: true })
+    lastCallReminderNotifiedAt: Date | null;
+
+    @Column({ type: 'timestamp', nullable: true })
     lastPaymentNotifiedAt: Date | null;
 
     @Column({ type: 'uuid', nullable: true })
     inCallByEmployeeId: string | null;
+    
+    @Column({ type: 'uuid', nullable: true })
+    remindEmployeeId: string | null;
+
+    @Column({ type: 'uuid', nullable: true })
+    soldByEmployeeId: string | null;
 
     @Column({ type: 'varchar', nullable: true })
     inCallByName: string | null;

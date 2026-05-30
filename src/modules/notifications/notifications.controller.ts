@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Request, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, Request, UseGuards } from '@nestjs/common';
 import { NotificationsService } from './notifications.service';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
@@ -11,8 +11,8 @@ export class NotificationsController {
     constructor(private readonly notificationsService: NotificationsService) {}
 
     @Get()
-    getNotifications(@Request() req) {
-        return this.notificationsService.getNotifications(req.user.id || req.user.sub);
+    getNotifications(@Request() req, @Query('limit') limit?: number) {
+        return this.notificationsService.getNotifications(req.user.id || req.user.sub, limit);
     }
 
     @Patch(':id/read')

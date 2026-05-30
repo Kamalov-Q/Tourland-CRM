@@ -102,9 +102,9 @@ export class TelegramService implements OnModuleInit {
         });
 
         if (employee) {
-            this.logger.log(`Linked Telegram user ${telegramUser.telegramId} with CRM employee ${employee.id}`);
-            // Logic to track linking if needed, e.g. adding telegramId to User entity
-            // For now, we can just find them by phone number whenever needed.
+            this.logger.log(`Linking Telegram user ${telegramUser.telegramId} with CRM employee ${employee.id}`);
+            employee.telegramId = telegramUser.telegramId;
+            await this.userRepo.save(employee);
         }
     }
 
@@ -123,6 +123,15 @@ export class TelegramService implements OnModuleInit {
     }
 
     async sendToEmployee(phoneNumber: string, text: string) {
+        // First try to find by already linked telegramId in User repo
+        const employee = await this.userRepo.findOne({ where: { phoneNumber: phoneNumber.replace('+', '') } });
+        
+        if (employee && employee.telegramId) {
+            await this.sendMessage([employee.telegramId], text);
+            return;
+        }
+
+        // Fallback to searching in TelegramUser repo
         const tUser = await this.telegramUserRepo.findOne({ where: { phoneNumber: phoneNumber.replace('+', '') } });
         if (tUser) {
             await this.sendMessage([tUser.telegramId], text);

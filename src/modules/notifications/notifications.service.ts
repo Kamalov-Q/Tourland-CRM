@@ -35,11 +35,11 @@ export class NotificationsService {
         }
     }
 
-    async getNotifications(userId: string) {
+    async getNotifications(userId: string, limit?: number) {
         return this.notificationRepo.find({
             where: { userId },
             order: { createdAt: 'DESC' },
-            take: 50,
+            take: limit || 100,
         });
     }
 
@@ -104,8 +104,12 @@ export class NotificationsService {
     private async sendTelegram(userId: string, message: string) {
         try {
             const user = await this.userRepo.findOne({ where: { id: userId } });
-            if (user && user.phoneNumber) {
-                await this.telegramService.sendToEmployee(user.phoneNumber, `🔔 <b>Yangi bildirishnoma:</b>\n\n${message}`);
+            if (user) {
+                if (user.telegramId) {
+                    await this.telegramService.sendMessage([user.telegramId], `🔔 <b>Yangi bildirishnoma:</b>\n\n${message}`);
+                } else if (user.phoneNumber) {
+                    await this.telegramService.sendToEmployee(user.phoneNumber, `🔔 <b>Yangi bildirishnoma:</b>\n\n${message}`);
+                }
             }
         } catch (err) {
             this.logger.error(`Failed to send Telegram notification to user ${userId}: ${err.message}`);
