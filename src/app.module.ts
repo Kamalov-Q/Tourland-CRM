@@ -16,6 +16,7 @@ import { FormsModule } from './modules/forms/forms.module';
 import { HealthModule } from './modules/health/health.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { TelegramModule } from './modules/telegram/telegram.module';
+import { ToursModule } from './modules/tours/tours.module';
 
 @Module({
   imports: [ConfigModule.forRoot({
@@ -51,6 +52,7 @@ import { TelegramModule } from './modules/telegram/telegram.module';
     DepartmentsModule,
     ClientsModule,
     AttendanceModule,
+    ToursModule,
     ArchiveModule,
     FormsModule,
     HealthModule,
