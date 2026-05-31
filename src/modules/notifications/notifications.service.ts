@@ -75,7 +75,7 @@ export class NotificationsService {
         return this.pushRepo.save(sub);
     }
 
-    async createNotification(userId: string, type: any, message: string, data?: any) {
+    async createNotification(userId: string, type: any, message: string, data?: any, options?: { skipTelegram?: boolean }) {
         const notification = this.notificationRepo.create({
             userId,
             type,
@@ -95,8 +95,7 @@ export class NotificationsService {
             data: { url: '/notifications' }
         });
 
-        // Send Telegram Notification if linked
-        this.sendTelegram(userId, message);
+        // Telegram is NEVER sent automatically — only via manual admin action from the UI.
 
         return saved;
     }
@@ -134,7 +133,7 @@ export class NotificationsService {
                     await this.pushRepo.remove(sub);
                 } else {
                     this.logger.error(`Error sending web push: ${err.message}`);
-                }
+                } 
             }
         }
     }

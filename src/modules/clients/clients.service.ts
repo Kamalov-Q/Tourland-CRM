@@ -331,19 +331,22 @@ export class ClientsService {
         }
 
         // 2. Payment Reminders (nextPaymentAt)
-        // Notify every 10 minutes if unpaid
-        const tenMinsAgo = new Date(now.getTime() - 10 * 60 * 1000);
+        // First notification fires 20 minutes after overdue; repeats every 20 minutes.
+        // Telegram is suppressed — in-app + web push only.
+        const twentyMinsAgo = new Date(now.getTime() - 20 * 60 * 1000);
         const paymentReminders = await this.clientRepo.find({
             where: [
                 {
+                    // First notification: overdue by at least 20 minutes, never notified yet
                     saleStatus: SaleStatus.PARTIAL,
-                    nextPaymentAt: LessThanOrEqual(now),
+                    nextPaymentAt: LessThanOrEqual(twentyMinsAgo),
                     lastPaymentNotifiedAt: IsNull()
                 },
                 {
+                    // Repeat: last notification was at least 20 minutes ago
                     saleStatus: SaleStatus.PARTIAL,
                     nextPaymentAt: LessThanOrEqual(now),
-                    lastPaymentNotifiedAt: LessThanOrEqual(tenMinsAgo)
+                    lastPaymentNotifiedAt: LessThanOrEqual(twentyMinsAgo)
                 }
             ]
         });
@@ -355,8 +358,8 @@ export class ClientsService {
 
                 const isFirstNotification = !client.lastPaymentNotifiedAt;
                 const message = isFirstNotification
-                    ? `💰 Mijoz ${client.fullName} uchun to'lov vaqti keldi`
-                    : `💸 Mijoz ${client.fullName} uchun to'lov hali amalga oshirilmagan`;
+                    ? `💰 Mijoz "${client.fullName}" uchun to'lov vaqti keldi`
+                    : `💸 Mijoz "${client.fullName}" uchun to'lov hali amalga oshirilmagan`;
 
                 // Notify ONLY the employee who made the sale (targeted)
                 if (client.soldByEmployeeId) {
@@ -365,7 +368,8 @@ export class ClientsService {
                             client.soldByEmployeeId,
                             NotificationType.CLIENT_PAYMENT,
                             message,
-                            { clientId: client.id, clientName: client.fullName }
+                            { clientId: client.id, clientName: client.fullName },
+                            { skipTelegram: true }
                         );
                     } catch (err) {
                         this.logger.error(`Failed to notify seller ${client.soldByEmployeeId} for payment reminder: ${err.message}`);

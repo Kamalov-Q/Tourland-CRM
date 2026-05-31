@@ -50,8 +50,26 @@ export class TelegramService implements OnModuleInit {
                 await this.telegramUserRepo.save(user);
             }
 
+            if (user.phoneNumber) {
+                await ctx.reply(
+                    `✅ Siz allaqachon ro'yxatdan o'tgansiz!\n\n👤 ${user.tempFullName || `${user.firstName} ${user.lastName || ''}`.trim()}\n📞 +${user.phoneNumber}`,
+                );
+                return;
+            }
+
             await ctx.reply(
-                `Assalomu alaykum, ${ctx.from.first_name}! \n\nTourland CRM botiga xush kelibsiz. Iltimos, ro'yxatdan o'tish uchun to'liq ismingizni (F.I.O) kiriting:`,
+                `👋 Assalomu alaykum, ${ctx.from.first_name}!\n\n` +
+                `Tourland CRM botiga xush kelibsiz.\n\n` +
+                `📞 Ro'yxatdan o'tish uchun telefon raqamingizni yuboring.\n` +
+                `Quyidagi <b>«📱 Telefon raqamni yuborish»</b> tugmasini bosing:`,
+                {
+                    parse_mode: 'HTML',
+                    reply_markup: {
+                        keyboard: [[{ text: '📱 Telefon raqamni yuborish', request_contact: true }]],
+                        one_time_keyboard: true,
+                        resize_keyboard: true,
+                    },
+                }
             );
         });
 
@@ -62,14 +80,20 @@ export class TelegramService implements OnModuleInit {
 
             if (user) {
                 user.phoneNumber = contact.phone_number.replace('+', '');
+                // Use the full name from the contact if provided, otherwise use Telegram name
+                if (contact.first_name) {
+                    user.tempFullName = [contact.first_name, contact.last_name].filter(Boolean).join(' ');
+                }
                 await this.telegramUserRepo.save(user);
 
                 await ctx.reply(
-                    "Rahmat! Siz muvaffaqiyatli ro'yxatdan o'tdingiz. Tez orada sizga xabarlar yuboriladi.",
-                    Markup.removeKeyboard(),
+                    `✅ <b>Muvaffaqiyatli ro'yxatdan o'tdingiz!</b>\n\n` +
+                    `👤 ${user.tempFullName || `${user.firstName} ${user.lastName || ''}`.trim()}\n` +
+                    `📞 +${user.phoneNumber}\n\n` +
+                    `Endi siz CRM tizimidan bildirishnomalar olasiz.`,
+                    { parse_mode: 'HTML', reply_markup: { remove_keyboard: true } },
                 );
 
-                // Optional: Attempt to link with CRM employee
                 this.linkWithEmployee(user);
             }
         });
@@ -78,18 +102,20 @@ export class TelegramService implements OnModuleInit {
             const userId = ctx.from.id.toString();
             const user = await this.telegramUserRepo.findOne({ where: { telegramId: userId } });
 
-            if (user && !user.phoneNumber && !user.tempFullName) {
-                user.tempFullName = ctx.message.text;
-                await this.telegramUserRepo.save(user);
-
+            if (user && !user.phoneNumber) {
+                // Remind them to use the button instead of typing
                 await ctx.reply(
-                    "Ajoyib! Endi telefon raqamingizni tasdiqlash uchun quyidagi tugmani bosing:",
-                    Markup.keyboard([
-                        [Markup.button.contactRequest('📞 Telefon raqamni yuborish')]
-                    ]).oneTime().resize(),
+                    `⚠️ Iltimos, matn yozish o'rniga quyidagi tugmani bosib telefon raqamingizni yuboring:`,
+                    {
+                        reply_markup: {
+                            keyboard: [[{ text: '📱 Telefon raqamni yuborish', request_contact: true }]],
+                            one_time_keyboard: true,
+                            resize_keyboard: true,
+                        },
+                    }
                 );
             } else if (user && user.phoneNumber) {
-                // Handle other text if needed, or just ignore
+                await ctx.reply(`✅ Siz allaqachon ro'yxatdan o'tgansiz. Tizimdan bildirishnomalarni kuting.`);
             }
         });
     }
