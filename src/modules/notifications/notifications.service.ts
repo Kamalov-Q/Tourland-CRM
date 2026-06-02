@@ -88,14 +88,15 @@ export class NotificationsService {
         // Emit via Socket.io
         this.gateway.server.to(userId).emit('notification', saved);
 
+        const user = await this.userRepo.findOne({ where: { id: userId } });
+        const redirectUrl = user?.role === 'DIRECTOR' ? '/director/notifications' : '/employee/notifications';
+
         // Send Web Push
         this.sendWebPush(userId, {
             title: 'Tourland CRM',
             body: message,
-            data: { url: '/notifications' }
+            data: { url: redirectUrl }
         });
-
-        // Telegram is NEVER sent automatically — only via manual admin action from the UI.
 
         return saved;
     }

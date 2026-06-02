@@ -58,10 +58,12 @@ export class TelegramService implements OnModuleInit {
             }
 
             await ctx.reply(
-                `👋 Assalomu alaykum, ${ctx.from.first_name}!\n\n` +
-                `Tourland CRM botiga xush kelibsiz.\n\n` +
-                `📞 Ro'yxatdan o'tish uchun telefon raqamingizni yuboring.\n` +
-                `Quyidagi <b>«📱 Telefon raqamni yuborish»</b> tugmasini bosing:`,
+                `👋 Assalomu alaykum, ${ctx.from.first_name}!\n` +
+                `Tourland yordamchi xush kelibsiz!\n\n` +
+                `Bu bot sizga quyidagi xizmatlarni taqdim etadi:\n` +
+                `• 🧳 Yangi tur paketlar va takliflar haqida ma’lumot berish\n` +
+                `• 💳 To‘lov holati va muddati bo‘yicha eslatmalar yuborish\n\n` +
+                `📞 Tizimdan to‘liq foydalanish uchun avval ro‘yxatdan o‘ting`,
                 {
                     parse_mode: 'HTML',
                     reply_markup: {
@@ -89,8 +91,7 @@ export class TelegramService implements OnModuleInit {
                 await ctx.reply(
                     `✅ <b>Muvaffaqiyatli ro'yxatdan o'tdingiz!</b>\n\n` +
                     `👤 ${user.tempFullName || `${user.firstName} ${user.lastName || ''}`.trim()}\n` +
-                    `📞 +${user.phoneNumber}\n\n` +
-                    `Endi siz CRM tizimidan bildirishnomalar olasiz.`,
+                    `📞 +${user.phoneNumber}`,
                     { parse_mode: 'HTML', reply_markup: { remove_keyboard: true } },
                 );
 
@@ -103,9 +104,8 @@ export class TelegramService implements OnModuleInit {
             const user = await this.telegramUserRepo.findOne({ where: { telegramId: userId } });
 
             if (user && !user.phoneNumber) {
-                // Remind them to use the button instead of typing
                 await ctx.reply(
-                    `⚠️ Iltimos, matn yozish o'rniga quyidagi tugmani bosib telefon raqamingizni yuboring:`,
+                    `⚠️ Iltimos, quyidagi tugmani bosib telefon raqamingizni yuboring:`,
                     {
                         reply_markup: {
                             keyboard: [[{ text: '📱 Telefon raqamni yuborish', request_contact: true }]],
@@ -115,7 +115,7 @@ export class TelegramService implements OnModuleInit {
                     }
                 );
             } else if (user && user.phoneNumber) {
-                await ctx.reply(`✅ Siz allaqachon ro'yxatdan o'tgansiz. Tizimdan bildirishnomalarni kuting.`);
+                await ctx.reply(`✅ Siz allaqachon ro'yxatdan o'tgansiz!`);
             }
         });
     }
