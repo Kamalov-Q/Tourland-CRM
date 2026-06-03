@@ -95,11 +95,13 @@ export class TasksService {
         let currentDay = new Date(startDay);
         const instancesToCreate: any[] = [];
         while (currentDay <= endDay) {
-            const dateStr = currentDay.toISOString().split('T')[0];
-            const tempStart = new Date(dateStr);
-            tempStart.setHours(0, 0, 0, 0);
-            const expires = new Date(dateStr);
-            expires.setHours(23, 59, 59, 999);
+            const y = currentDay.getFullYear();
+            const m = String(currentDay.getMonth() + 1).padStart(2, '0');
+            const d = String(currentDay.getDate()).padStart(2, '0');
+            const dateStr = `${y}-${m}-${d}`;
+
+            const tempStart = new Date(`${dateStr}T00:00:00.000`);
+            const expires = new Date(`${dateStr}T23:59:59.999`);
 
             instancesToCreate.push({
                 templateId: saved.id,
@@ -108,10 +110,18 @@ export class TasksService {
                 expiresAt: expires,
                 status: TaskStatus.TODO
             });
-            currentDay.setUTCDate(currentDay.getUTCDate() + 1);
+            currentDay.setDate(currentDay.getDate() + 1);
         }
         const instances = this.taskRepo.create(instancesToCreate);
         await this.taskRepo.save(instances);
+
+        // Notify Employee (async)
+        this.notificationsService.createNotification(
+            saved.assignedTo,
+            NotificationType.TASK_CREATED,
+            `📌 Yangi topshiriq: "${saved.title}". Iltimos, muddatiga e'tibor bering.`,
+            { taskId: instances[0]?.id || saved.id }
+        ).catch(err => console.error('Task notification failed', err));
 
         if (todayDate >= startDay && todayDate <= endDay) {
             const isToday = todayStart.getTime() === startDay.getTime();
@@ -247,7 +257,7 @@ export class TasksService {
                 await this.notificationsService.createNotification(
                     notifyUserId,
                     NotificationType.TASK_STATUS_CHANGED,
-                    `"${task.template.title}" topshirig'i holati ${actorName} tomonidan "${statusLabel}" holatiga o'zgardi`,
+                    `🔄 "${task.template.title}": ${actorName} holatni "${statusLabel}" ga o'zgartirdi.`,
                     { taskId: task.id }
                 );
 
@@ -318,7 +328,7 @@ export class TasksService {
             await this.notificationsService.createNotification(
                 task.assignedTo,
                 NotificationType.TASK_VERIFIED,
-                `"${task.template.title}" topshirig'i direktor (${actorName}) tomonidan tasdiqlandi`,
+                `✅ "${task.template.title}" tasdiqlandi. Rahmat!`,
                 { taskId: task.id }
             );
 
@@ -382,7 +392,7 @@ export class TasksService {
             await this.notificationsService.createNotification(
                 task.assignedTo,
                 NotificationType.TASK_REJECTED,
-                `"${task.template.title}" topshirig'i direktor (${actorName}) tomonidan rad etildi`,
+                `❌ "${task.template.title}" rad etildi. Sababni ko'rib chiqing.`,
                 { taskId: task.id }
             );
 

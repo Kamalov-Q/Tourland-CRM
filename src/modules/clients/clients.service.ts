@@ -15,7 +15,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationType } from '../notifications/enums/notification-type.enum';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { LessThanOrEqual, IsNull } from 'typeorm';
-import { User } from '../users/entities/user.entity';
+import { User, UserRole } from '../users/entities/user.entity';
 
 @Injectable()
 export class ClientsService {
@@ -60,11 +60,25 @@ export class ClientsService {
 
         const saved = await this.clientRepo.save(client);
 
-        this.clientsGateway.emitClientUpdate(saved.id, saved);
+        const fullClient = await this.findOne(saved.id);
+
+        this.clientsGateway.emitClientUpdate(fullClient.id, fullClient);
 
         await this.activityRepo.save({
             actionType: 'CLIENT_CREATED',
             details: { clientId: saved.id, fullName: saved.fullName }
+        });
+
+        // Notify ALL users (async)
+        this.getAllUserIds().then(userIds => {
+            for (const userId of userIds) {
+                this.notificationsService.createNotification(
+                    userId,
+                    NotificationType.CLIENT_REMINDER,
+                    `🆕 Yangi mijoz: ${saved.fullName}. Uni "Yangi" bo'limidan ko'rishingiz mumkin.`,
+                    { clientId: saved.id }
+                ).catch(err => console.error('Notification failed', err));
+            }
         });
 
         return saved;
@@ -212,6 +226,18 @@ export class ClientsService {
                 details: { clientId, amount: payment.amount }
             });
 
+            // Notify directors (async)
+            this.getDirectorIds().then(directorIds => {
+                for (const directorId of directorIds) {
+                    this.notificationsService.createNotification(
+                        directorId,
+                        NotificationType.CLIENT_PAYMENT,
+                        `💰 "${client.fullName}" uchun ${payment.amount} so'm to'lov qabul qilindi.`,
+                        { clientId, paymentId: saved.id }
+                    ).catch(err => console.error('Notification failed', err));
+                }
+            });
+
             return saved;
         });
     }
@@ -289,6 +315,25 @@ export class ClientsService {
             details: { clientId, status: saved.saleStatus, totalAmount: saved.saleTotalAmount }
         });
 
+        // Notify directors (async)
+        this.getDirectorIds().then(directorIds => {
+            for (const directorId of directorIds) {
+                const statusLabels: Record<string, string> = {
+                    full: "to'liq",
+                    partial: "bo'lib to'lash (nasiya)",
+                    none: "bekor qilindi",
+                };
+                const statusLabel = statusLabels[saved.saleStatus] || saved.saleStatus;
+
+                this.notificationsService.createNotification(
+                    directorId,
+                    NotificationType.CLIENT_PAYMENT,
+                    `💳 Mijoz "${saved.fullName}" sotuv holati yangilandi: ${statusLabel}`,
+                    { clientId, status: saved.saleStatus }
+                ).catch(err => console.error('Notification failed', err));
+            }
+        });
+
         return saved;
     }
 
@@ -300,9 +345,24 @@ export class ClientsService {
         return users.map(u => u.id);
     }
 
+    private async getDirectorIds(): Promise<string[]> {
+        const directors = await this.userRepo.find({ 
+            where: { role: UserRole.DIRECTOR },
+            select: ['id'] 
+        });
+        return directors.map(d => d.id);
+    }
+
+    private isAllowedTime(): boolean {
+        const now = new Date();
+        const hour = now.getHours();
+        return hour >= 9 && hour < 22;
+    }
+
     @Cron(CronExpression.EVERY_MINUTE)
     async handleReminders() {
         const now = new Date();
+        const canNotify = this.isAllowedTime();
 
         // 1. Call Reminders (remindAt)
         const callReminders = await this.clientRepo.find({
@@ -312,15 +372,17 @@ export class ClientsService {
         });
 
         for (const client of callReminders) {
-            this.clientsGateway.emitReminder(client.id, client.fullName);
+            if (canNotify) {
+                this.clientsGateway.emitReminder(client.id, client.fullName);
+            }
 
-            // Notify the specific employee who set the reminder
+            // Notify the specific employee who set the reminder (createNotification handles its own time guard)
             const targetEmployeeId = client.remindEmployeeId || client.inCallByEmployeeId;
             if (targetEmployeeId) {
                 await this.notificationsService.createNotification(
                     targetEmployeeId,
                     NotificationType.CLIENT_REMINDER,
-                    `🔔 Mijoz ${client.fullName} uchun qo'ng'iroq eslatmasi vaqti keldi`,
+                    `🔔 "${client.fullName}" bilan bog'lanish vaqti keldi. Qayta qo'ng'iroq qiling.`,
                     { clientId: client.id }
                 );
             }
@@ -331,22 +393,22 @@ export class ClientsService {
         }
 
         // 2. Payment Reminders (nextPaymentAt)
-        // First notification fires 20 minutes after overdue; repeats every 20 minutes.
+        // First notification fires 3 hours after overdue; repeats every 3 hours.
         // Telegram is suppressed — in-app + web push only.
-        const twentyMinsAgo = new Date(now.getTime() - 20 * 60 * 1000);
+        const threeHoursAgo = new Date(now.getTime() - 180 * 60 * 1000);
         const paymentReminders = await this.clientRepo.find({
             where: [
                 {
-                    // First notification: overdue by at least 20 minutes, never notified yet
+                    // First notification: overdue by at least 3 hours, never notified yet
                     saleStatus: SaleStatus.PARTIAL,
-                    nextPaymentAt: LessThanOrEqual(twentyMinsAgo),
+                    nextPaymentAt: LessThanOrEqual(threeHoursAgo),
                     lastPaymentNotifiedAt: IsNull()
                 },
                 {
-                    // Repeat: last notification was at least 20 minutes ago
+                    // Repeat: last notification was at least 3 hours ago
                     saleStatus: SaleStatus.PARTIAL,
                     nextPaymentAt: LessThanOrEqual(now),
-                    lastPaymentNotifiedAt: LessThanOrEqual(twentyMinsAgo)
+                    lastPaymentNotifiedAt: LessThanOrEqual(threeHoursAgo)
                 }
             ]
         });
@@ -354,12 +416,14 @@ export class ClientsService {
         if (paymentReminders.length > 0) {
             for (const client of paymentReminders) {
                 // Broadcast socket event to everyone (still useful for real-time UI)
-                this.clientsGateway.emitPaymentReminder(client.id, client.fullName);
+                if (canNotify) {
+                    this.clientsGateway.emitPaymentReminder(client.id, client.fullName);
+                }
 
                 const isFirstNotification = !client.lastPaymentNotifiedAt;
                 const message = isFirstNotification
-                    ? `💰 Mijoz "${client.fullName}" uchun to'lov vaqti keldi`
-                    : `💸 Mijoz "${client.fullName}" uchun to'lov hali amalga oshirilmagan`;
+                    ? `💰 "${client.fullName}" uchun to'lov muddati keldi.`
+                    : `💸 "${client.fullName}" uchun kutilayotgan to'lov hali amalga oshirilmadi.`;
 
                 // Notify ONLY the employee who made the sale (targeted)
                 if (client.soldByEmployeeId) {
@@ -405,7 +469,7 @@ export class ClientsService {
                     await this.notificationsService.createNotification(
                         targetEmployeeId,
                         NotificationType.CLIENT_REMINDER,
-                        `⏳ Mijoz "${client.fullName}" bilan qayta bog'lanish vaqti keldi. Iltimos, qayta bog'lanishga harakat qiling!`,
+                        `⏳ "${client.fullName}" ko'tarmadi. Iltimos, yana bir bor bog'lanishga harakat qiling.`,
                         { clientId: client.id, type: 'persistent_reminder' }
                     );
                     

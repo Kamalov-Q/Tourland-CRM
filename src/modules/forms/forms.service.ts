@@ -9,6 +9,7 @@ import { Client } from '../clients/entities/client.entity';
 import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationType } from '../notifications/enums/notification-type.enum';
 import { User, UserRole } from '../users/entities/user.entity';
+import { ClientsGateway } from '../clients/gateways/clients.gateway';
 
 @Injectable()
 export class FormsService {
@@ -23,6 +24,7 @@ export class FormsService {
     private readonly userRepo: Repository<User>,
     private readonly notificationsService: NotificationsService,
     private readonly dataSource: DataSource,
+    private readonly clientsGateway: ClientsGateway,
   ) { }
 
   async create(dto: CreateFormDto) {
@@ -41,6 +43,18 @@ export class FormsService {
     await this.activityRepo.save({
       actionType: 'FORM_CREATED',
       details: { formId: saved.id, title: saved.title, departmentId: saved.targetDepartmentId }
+    });
+
+    // Notify directors (async)
+    this.getDirectorIds().then(directorIds => {
+      for (const dirId of directorIds) {
+        this.notificationsService.createNotification(
+          dirId,
+          NotificationType.FORM_UPDATE,
+          `📄 Yangi forma yaratildi: "${saved.title}"`,
+          { formId: saved.id }
+        ).catch(err => console.error('Notification failed', err));
+      }
     });
 
     return saved;
@@ -90,6 +104,18 @@ export class FormsService {
         details: { formId: saved.id, title: saved.title }
       });
 
+      // Notify directors (async)
+      this.getDirectorIds().then(directorIds => {
+        for (const dirId of directorIds) {
+          this.notificationsService.createNotification(
+            dirId,
+            NotificationType.FORM_UPDATE,
+            `📝 Forma tahrirlandi: "${saved.title}"`,
+            { formId: saved.id }
+          ).catch(err => console.error('Notification failed', err));
+        }
+      });
+
       return saved;
     });
   }
@@ -123,23 +149,39 @@ export class FormsService {
       });
       const savedClient = await manager.save(client);
 
+      this.clientsGateway.emitClientUpdate(savedClient.id, savedClient);
+
       await manager.save(ActivityLog, {
         actionType: 'CLIENT_CREATED',
         details: { clientId: savedClient.id, fullName: savedClient.fullName, source: form.title }
       });
 
-      // Notify Director
-      const director = await manager.findOne(User, { where: { role: UserRole.DIRECTOR, isActive: true } });
-      if (director) {
-        await this.notificationsService.createNotification(
-          director.id,
-          NotificationType.FORM_UPDATE,
-          `Yangi ariqa kelib tushdi: "${form.title}" (Mijoz: ${savedClient.fullName})`,
-          { clientId: savedClient.id }
-        );
-      }
+      // Notify ALL users (async)
+      this.getAllUserIds().then(userIds => {
+        for (const userId of userIds) {
+          this.notificationsService.createNotification(
+            userId,
+            NotificationType.FORM_UPDATE,
+            `Yangi ariza kelib tushdi: "${form.title}" (Mijoz: ${savedClient.fullName})`,
+            { clientId: savedClient.id }
+          ).catch(err => console.error('Notification failed', err));
+        }
+      });
 
       return savedClient;
     });
+  }
+
+  private async getAllUserIds(): Promise<string[]> {
+    const users = await this.userRepo.find({ select: ['id'] });
+    return users.map(u => u.id);
+  }
+
+  private async getDirectorIds(): Promise<string[]> {
+    const directors = await this.userRepo.find({
+      where: { role: UserRole.DIRECTOR },
+      select: ['id']
+    });
+    return directors.map(d => d.id);
   }
 }

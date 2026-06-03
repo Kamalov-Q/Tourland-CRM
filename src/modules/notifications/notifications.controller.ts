@@ -11,8 +11,12 @@ export class NotificationsController {
     constructor(private readonly notificationsService: NotificationsService) {}
 
     @Get()
-    getNotifications(@Request() req, @Query('limit') limit?: number) {
-        return this.notificationsService.getNotifications(req.user.id || req.user.sub, limit);
+    getNotifications(
+        @Request() req,
+        @Query('page') page?: number,
+        @Query('limit') limit?: number
+    ) {
+        return this.notificationsService.getNotifications(req.user.id || req.user.sub, page, limit);
     }
 
     @Patch(':id/read')

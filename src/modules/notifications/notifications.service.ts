@@ -35,12 +35,20 @@ export class NotificationsService {
         }
     }
 
-    async getNotifications(userId: string, limit?: number) {
-        return this.notificationRepo.find({
+    async getNotifications(userId: string, page: number = 1, limit: number = 20) {
+        const [items, total] = await this.notificationRepo.findAndCount({
             where: { userId },
             order: { createdAt: 'DESC' },
             take: limit || 100,
+            skip: ((page || 1) - 1) * (limit || 100),
         });
+        return {
+            items,
+            total,
+            page: Number(page) || 1,
+            limit: Number(limit) || 100,
+            totalPages: Math.ceil(total / (limit || 100))
+        };
     }
 
     async markAsRead(id: string, userId: string) {
@@ -75,6 +83,12 @@ export class NotificationsService {
         return this.pushRepo.save(sub);
     }
 
+    private isAllowedTime(): boolean {
+        const now = new Date();
+        const hour = now.getHours();
+        return hour >= 9 && hour < 22;
+    }
+
     async createNotification(userId: string, type: any, message: string, data?: any, options?: { skipTelegram?: boolean }) {
         const notification = this.notificationRepo.create({
             userId,
@@ -85,18 +99,28 @@ export class NotificationsService {
         });
         const saved = await this.notificationRepo.save(notification);
 
-        // Emit via Socket.io
-        this.gateway.server.to(userId).emit('notification', saved);
+        // Only deliver (Socket, Push, Telegram) if within allowed hours (09:00 - 22:00)
+        if (this.isAllowedTime()) {
+            // Emit via Socket.io
+            this.gateway.server.to(userId).emit('notification', saved);
 
-        const user = await this.userRepo.findOne({ where: { id: userId } });
-        const redirectUrl = user?.role === 'DIRECTOR' ? '/director/notifications' : '/employee/notifications';
+            const user = await this.userRepo.findOne({ where: { id: userId } });
+            const redirectUrl = user?.role === 'DIRECTOR' ? '/director/notifications' : '/employee/notifications';
 
-        // Send Web Push
-        this.sendWebPush(userId, {
-            title: 'Tourland CRM',
-            body: message,
-            data: { url: redirectUrl }
-        });
+            // Send Web Push
+            this.sendWebPush(userId, {
+                title: 'Tourland CRM',
+                body: message,
+                data: { url: redirectUrl }
+            });
+
+            // Send Telegram
+            if (!options?.skipTelegram) {
+                this.sendTelegram(userId, message).catch(err => 
+                    this.logger.error(`Immediate Telegram notification failed: ${err.message}`)
+                );
+            }
+        }
 
         return saved;
     }
