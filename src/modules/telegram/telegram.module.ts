@@ -17,4 +17,4 @@ import { ToursModule } from '../tours/tours.module';
   providers: [TelegramService],
   exports: [TelegramService],
 })
-export class TelegramModule {}
+export class TelegramModule { }

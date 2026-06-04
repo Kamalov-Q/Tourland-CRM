@@ -1,10 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, In } from 'typeorm';
 import { Notification } from './entities/notification.entity';
 import { PushSubscription as PushSubscriptionEntity } from '../users/entities/push-subscription.entity';
 import { NotificationGateway } from './gateways/notification.gateway';
-import { ConfigService } from '@nestjs/config';
 import { User } from '../users/entities/user.entity';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
@@ -27,7 +26,6 @@ export class NotificationsService {
         @InjectRepository(User)
         private readonly userRepo: Repository<User>,
         private readonly gateway: NotificationGateway,
-        private readonly configService: ConfigService,
         @InjectQueue('notification-queue')
         private readonly notificationQueue: Queue,
     ) {}
@@ -80,12 +78,6 @@ export class NotificationsService {
         return this.pushRepo.save(sub);
     }
 
-    private isAllowedTime(): boolean {
-        const now = dayjs().tz('Asia/Tashkent');
-        const hour = now.hour();
-        return hour >= 9 && hour < 22;
-    }
-
     async createNotification(userId: string, type: any, message: string, data?: any, options?: { skipTelegram?: boolean; user?: User }) {
         const notification = this.notificationRepo.create({
             userId,
@@ -130,22 +122,30 @@ export class NotificationsService {
 
         const saved = await this.notificationRepo.save(notifications);
 
+        const users = await this.userRepo.findBy({ id: In(userIds) });
+        const userMap = new Map(users.map(u => [u.id, u]));
+
         // Batch process delivery jobs
-        const jobs = saved.map(n => ({
-            name: 'send-delivery',
-            data: {
-                userId: n.userId,
-                message,
-                payload: {
-                    title: 'Tourland CRM',
-                    body: message,
-                    data: { url: '/notifications' } // Generic for batch
-                },
-                options: {
-                    skipTelegram: options?.skipTelegram
+        const jobs = saved.map(n => {
+            const user = userMap.get(n.userId);
+            const redirectUrl = user?.role === 'DIRECTOR' ? '/director/notifications' : '/employee/notifications';
+            
+            return {
+                name: 'send-delivery',
+                data: {
+                    userId: n.userId,
+                    message,
+                    payload: {
+                        title: 'Tourland CRM',
+                        body: message,
+                        data: { url: redirectUrl }
+                    },
+                    options: {
+                        skipTelegram: options?.skipTelegram
+                    }
                 }
-            }
-        }));
+            };
+        });
         
         // Emit sockets instantly
         saved.forEach(n => this.gateway.server.to(n.userId).emit('notification', n));
