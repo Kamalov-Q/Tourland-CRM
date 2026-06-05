@@ -301,7 +301,7 @@ export class ClientsService {
 
             // Notify CLIENT via Telegram (async) if linked
             if (client.telegramId) {
-                const clientMessage = `💰 <b>To'lov qabul qilindi:</b> ${payment.amount.toLocaleString()} so'm.\n\nKo'p rahmat! 😊`;
+                const clientMessage = `✅ <b>To'lov qabul qilindi!</b>\n\nHurmatli mijoz, sizning <b>${payment.amount.toLocaleString()} so'm</b> miqdoridagi to'lovingiz muvaffaqiyatli qabul qilindi.\n\nIshonchingiz uchun rahmat! ✨`;
                 this.telegramService.sendMessage([client.telegramId], clientMessage)
                     .catch(err => this.logger.error(`Failed to send payment confirmation to client ${client.id}: ${err.message}`));
             }
