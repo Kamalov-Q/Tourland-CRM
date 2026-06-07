@@ -1,5 +1,6 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { BadRequestException, Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, Query, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -132,5 +133,18 @@ export class ClientsController {
         @CurrentUser() user: AuthenticatedUser
     ) {
         return this.clientsService.warn(id, new Date(dto.remindAt), user as AuthenticatedUser);
+    }
+
+    @Post('import-excel')
+    @Roles(UserRole.DIRECTOR, UserRole.EMPLOYEE)
+    @UseInterceptors(FileInterceptor('file'))
+    @ApiConsumes('multipart/form-data')
+    @ApiOperation({ summary: 'Import clients from Excel file' })
+    async importExcel(
+        @UploadedFile() file: Express.Multer.File,
+        @Body('departmentId') departmentId: string,
+    ) {
+        if (!file) throw new BadRequestException('File is required');
+        return this.clientsService.importFromExcel(file.buffer, departmentId);
     }
 }

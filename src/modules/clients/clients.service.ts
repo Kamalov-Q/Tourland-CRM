@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, Logger, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { CreateClientDto } from './dto/create-client.dto';
@@ -17,6 +17,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { LessThanOrEqual, IsNull } from 'typeorm';
 import { User, UserRole } from '../users/entities/user.entity';
 import { TelegramService } from '../telegram/telegram.service';
+import * as XLSX from 'xlsx';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
@@ -120,6 +121,9 @@ export class ClientsService {
         if (dto.departmentId && dto.departmentId !== client.departmentId) {
             const dep = await this.departmentRepo.findOne({ where: { id: dto.departmentId } });
             if (!dep) throw new BadRequestException('Department not found');
+        }
+        if ((dto.fullName || dto.phoneNumber) && user.role !== UserRole.DIRECTOR) {
+            throw new ForbiddenException('Only directors can update name and phone number');
         }
         Object.assign(client, dto);
 
@@ -574,5 +578,87 @@ export class ClientsService {
                 }
             }
         }
+    }
+
+    async importFromExcel(
+        fileBuffer: Buffer,
+        departmentId: string,
+    ): Promise<{ imported: number; skipped: number; total: number }> {
+        // Verify department exists
+        const department = await this.departmentRepo.findOne({ where: { id: departmentId } });
+        if (!department) throw new BadRequestException('Department not found');
+
+        // Parse workbook
+        const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
+        const sheetName = workbook.SheetNames[0];
+        if (!sheetName) throw new BadRequestException('Excel file is empty');
+
+        const rows: Record<string, any>[] = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { defval: '' });
+        if (rows.length === 0) throw new BadRequestException('No data rows found in the Excel file');
+
+        // Flexible header mapping
+        const NAME_KEYS = ['fullname', 'full_name', 'ism', 'ism familya', 'ism familiya', 'name', 'familya', 'f.i.o', 'fio', 'fish'];
+        const PHONE_KEYS = ['phonenumber', 'phone_number', 'phone', 'telefon', 'tel', 'tel raqam', 'raqam', 'number'];
+
+        const findKey = (row: Record<string, any>, candidates: string[]): string | undefined => {
+            const rowKeys = Object.keys(row);
+            return rowKeys.find(k => candidates.includes(k.toLowerCase().trim()));
+        };
+
+        const firstRow = rows[0];
+        const nameKey = findKey(firstRow, NAME_KEYS);
+        const phoneKey = findKey(firstRow, PHONE_KEYS);
+
+        if (!nameKey) throw new BadRequestException("Column for name not found. Supported headers: " + NAME_KEYS.join(', '));
+        if (!phoneKey) throw new BadRequestException("Column for phone not found. Supported headers: " + PHONE_KEYS.join(', '));
+
+        // Extract and clean data
+        const parsed = rows
+            .map(row => ({
+                fullName: String(row[nameKey] || '').trim(),
+                phoneNumber: String(row[phoneKey] || '').replace(/\s+/g, '').trim(),
+            }))
+            .filter(r => r.fullName && r.phoneNumber);
+
+        if (parsed.length === 0) throw new BadRequestException('No valid rows with name and phone found');
+
+        // Get all existing phone numbers in one query
+        const allPhones = parsed.map(r => r.phoneNumber);
+        const existingClients = await this.clientRepo
+            .createQueryBuilder('c')
+            .select('c.phoneNumber')
+            .where('c.phoneNumber IN (:...phones)', { phones: allPhones })
+            .getMany();
+
+        const existingPhones = new Set(existingClients.map(c => c.phoneNumber));
+
+        // Filter out duplicates
+        const newClients = parsed.filter(r => !existingPhones.has(r.phoneNumber));
+
+        // Also deduplicate within the file itself
+        const seen = new Set<string>();
+        const uniqueNewClients = newClients.filter(r => {
+            if (seen.has(r.phoneNumber)) return false;
+            seen.add(r.phoneNumber);
+            return true;
+        });
+
+        // Bulk insert
+        if (uniqueNewClients.length > 0) {
+            const entities = uniqueNewClients.map(r =>
+                this.clientRepo.create({
+                    fullName: r.fullName,
+                    phoneNumber: r.phoneNumber,
+                    departmentId: department.id,
+                }),
+            );
+            await this.clientRepo.save(entities);
+        }
+
+        return {
+            imported: uniqueNewClients.length,
+            skipped: parsed.length - uniqueNewClients.length,
+            total: parsed.length,
+        };
     }
 }
