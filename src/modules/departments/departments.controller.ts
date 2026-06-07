@@ -1,5 +1,5 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { BadRequestException, Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, Query, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -41,6 +41,7 @@ export class DepartmentsController {
     @Get(':id')
     @Roles(UserRole.DIRECTOR, UserRole.EMPLOYEE)
     @ApiOperation({ summary: 'Get department with clients' })
+    @ApiParam({ name: 'id', description: 'Department UUID' })
     findOne(@Param('id') id: string) {
         return this.departmentsService.findOne(id);
     }
@@ -50,6 +51,7 @@ export class DepartmentsController {
     @Patch(':id')
     @Roles(UserRole.DIRECTOR, UserRole.EMPLOYEE)
     @ApiOperation({ summary: 'Update department name' })
+    @ApiParam({ name: 'id', description: 'Department UUID' })
     update(@Param('id') id: string, @Body() dto: UpdateDepartmentDto) {
         return this.departmentsService.update(id, dto);
     }
@@ -59,6 +61,7 @@ export class DepartmentsController {
     @Patch(':id/archive')
     @Roles(UserRole.DIRECTOR, UserRole.EMPLOYEE)
     @ApiOperation({ summary: 'Toggle archive status' })
+    @ApiParam({ name: 'id', description: 'Department UUID' })
     toggleArchive(@Param('id') id: string) {
         return this.departmentsService.toggleArchive(id);
     }
@@ -69,6 +72,7 @@ export class DepartmentsController {
     @Roles(UserRole.DIRECTOR, UserRole.EMPLOYEE)
     @HttpCode(HttpStatus.NO_CONTENT)
     @ApiOperation({ summary: 'Delete department' })
+    @ApiParam({ name: 'id', description: 'Department UUID' })
     async remove(@Param('id') id: string) {
         await this.departmentsService.remove(id);
     }

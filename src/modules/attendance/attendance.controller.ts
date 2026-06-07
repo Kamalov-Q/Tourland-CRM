@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Param, Post, Query, UseGuards } from "@nestjs/common";
-import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
+import { ApiBearerAuth, ApiOperation, ApiParam, ApiQuery, ApiTags } from "@nestjs/swagger";
 import { JwtAuthGuard } from "src/common/guards/jwt-auth.guard";
 import { RolesGuard } from "src/common/guards/roles.guard";
 import { AttendanceService } from "./attendance.service";
@@ -20,6 +20,8 @@ export class AttendanceController {
     @Get()
     @Roles(UserRole.DIRECTOR)
     @ApiOperation({ summary: 'List attendance records with filters (Director only)' })
+    @ApiQuery({ name: 'employeeId', required: false, description: 'Filter by employee ID' })
+    @ApiQuery({ name: 'date', required: false, description: 'Filter by date (YYYY-MM-DD)' })
     list(@Query('employeeId') employeeId?: string, @Query('date') date?: string) {
         return this.attendanceSvc.find({ employeeId, date });
     }
@@ -48,6 +50,7 @@ export class AttendanceController {
     @Get('employee/:id')
     @Roles(UserRole.DIRECTOR)
     @ApiOperation({ summary: 'Get specific employee attendance history (Director only)' })
+    @ApiParam({ name: 'id', description: 'Employee User UUID' })
     getEmployeeHistory(@Param('id') id: string) {
         return this.attendanceSvc.getHistory(id);
     }
@@ -55,6 +58,7 @@ export class AttendanceController {
     @Post('backfill')
     @Roles(UserRole.DIRECTOR)
     @ApiOperation({ summary: 'Backfill missing attendance records (Director only)' })
+    @ApiQuery({ name: 'days', required: false, type: Number, description: 'Number of days to backfill (default: 30)' })
     backfill(@Query('days') days?: number) {
         return this.attendanceSvc.backfillAttendance(days || 30);
     }

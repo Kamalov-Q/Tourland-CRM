@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import { FormsService } from './forms.service';
 import { CreateFormDto } from './dto/create-form.dto';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
@@ -19,12 +19,14 @@ export class FormsController {
 
   @Get('public/:id')
   @ApiOperation({ summary: 'Get a form template by ID for public submission' })
+  @ApiParam({ name: 'id', description: 'Form Template UUID' })
   getPublic(@Param('id') id: string) {
     return this.formsService.findOne(id);
   }
 
   @Post('submit/:id')
   @ApiOperation({ summary: 'Submit form data' })
+  @ApiParam({ name: 'id', description: 'Form Template UUID' })
   submit(@Param('id') id: string, @Body() body: SubmitFormDto) {
     return this.formsService.submitForm(id, body.data);
   }
@@ -54,6 +56,7 @@ export class FormsController {
   @Roles(UserRole.DIRECTOR, UserRole.EMPLOYEE)
   @Patch(':id')
   @ApiOperation({ summary: 'Update a form template' })
+  @ApiParam({ name: 'id', description: 'Form Template UUID' })
   update(@Param('id') id: string, @Body() dto: CreateFormDto) {
     return this.formsService.update(id, dto);
   }
@@ -64,6 +67,7 @@ export class FormsController {
   @Roles(UserRole.DIRECTOR, UserRole.EMPLOYEE)
   @Delete(':id')
   @ApiOperation({ summary: 'Delete a form template' })
+  @ApiParam({ name: 'id', description: 'Form Template UUID' })
   remove(@Param('id') id: string) {
     return this.formsService.remove(id);
   }

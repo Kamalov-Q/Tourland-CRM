@@ -97,6 +97,7 @@ export class TasksController {
     // GET SINGLE TASK
     @Get(':id')
     @ApiOperation({ summary: 'Get single task instance details' })
+    @ApiParam({ name: 'id', description: 'Task UUID' })
     findOne(@Param('id') id: string) {
         return this.tasksService.findOne(id);
     }
@@ -137,6 +138,15 @@ export class TasksController {
     @ApiOperation({
         summary:
             'Director rejects employee task',
+    })
+    @ApiParam({ name: 'id', description: 'Task UUID' })
+    @ApiBody({ 
+        schema: {
+            type: 'object',
+            properties: {
+                reason: { type: 'string', example: 'Missing proof of work' }
+            }
+        }
     })
 
     rejectTask(
@@ -216,6 +226,7 @@ export class TasksController {
     @ApiOperation({
         summary: 'Get all task instances for a specific template (daily logs)'
     })
+    @ApiParam({ name: 'templateId', description: 'Task Template UUID' })
     getTemplateInstances(@Param('templateId') templateId: string) {
         return this.tasksService.getTemplateInstances(templateId);
     }

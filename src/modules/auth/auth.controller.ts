@@ -27,18 +27,24 @@ export class AuthController {
 
     @Post('refresh')
     @ApiOperation({ summary: 'Refresh access token' })
+    @ApiResponse({ status: 201, description: 'Token successfully refreshed.' })
+    @ApiResponse({ status: 401, description: 'Invalid refresh token.' })
     refresh(@Body() dto: RefreshDto) {
         return this.authSvc.refresh(dto);
     }
 
     @Post('verify-pincode')
     @ApiOperation({ summary: 'Verify pincode for password reset' })
+    @ApiResponse({ status: 201, description: 'Pincode verified.' })
+    @ApiResponse({ status: 400, description: 'Invalid pincode or phone number.' })
     verifyPincode(@Body() dto: VerifyPincodeDto) {
         return this.authSvc.verifyPincode(dto.phoneNumber, dto.pincode);
     }
 
     @Post('forgot-password')
     @ApiOperation({ summary: 'Reset password using pincode' })
+    @ApiResponse({ status: 201, description: 'Password successfully reset.' })
+    @ApiResponse({ status: 400, description: 'Invalid pincode or phone number.' })
     forgotPassword(@Body() dto: ForgotPasswordDto) {
         return this.authSvc.forgotPassword(dto.phoneNumber, dto.pincode, dto.newPassword);
     }
@@ -47,6 +53,7 @@ export class AuthController {
     @UseGuards(JwtAuthGuard)
     @ApiBearerAuth()
     @ApiOperation({ summary: 'Logout and clear session' })
+    @ApiResponse({ status: 201, description: 'Successfully logged out.' })
     logout(@CurrentUser() user: AuthenticatedUser) {
         return this.authSvc.logout(user.id);
     }

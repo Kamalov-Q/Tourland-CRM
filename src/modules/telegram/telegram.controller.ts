@@ -5,6 +5,8 @@ import { RolesGuard } from 'src/common/guards/roles.guard';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { UserRole } from '../users/entities/user.entity';
 import { TelegramService } from './telegram.service';
+import { BroadcastMessageDto } from './dto/broadcast-message.dto';
+import { ClientMessageDto } from './dto/client-message.dto';
 
 @ApiTags('Telegram')
 @ApiBearerAuth()
@@ -23,7 +25,7 @@ export class TelegramController {
   @Post('broadcast')
   @Roles(UserRole.DIRECTOR, UserRole.EMPLOYEE)
   @ApiOperation({ summary: 'Send message to selected Telegram users' })
-  async broadcast(@Body() dto: { telegramIds: string[]; description: string; link?: string }) {
+  async broadcast(@Body() dto: BroadcastMessageDto) {
     const message = `<b>${dto.description}</b>${dto.link ? `\n\n<a href="${dto.link}">Havola: ${dto.link}</a>` : ''}`;
     await this.telegramService.sendMessage(dto.telegramIds, message);
     return { success: true };
@@ -32,7 +34,7 @@ export class TelegramController {
   @Post('client-message')
   @Roles(UserRole.DIRECTOR, UserRole.EMPLOYEE)
   @ApiOperation({ summary: 'Send message to client and link Telegram ID' })
-  async sendToClient(@Body() dto: { clientId: string; telegramId: string; description: string; link?: string }) {
+  async sendToClient(@Body() dto: ClientMessageDto) {
     const message = `<b>${dto.description}</b>${dto.link ? `\n\n<a href="${dto.link}">Havola: ${dto.link}</a>` : ''}`;
     await this.telegramService.sendClientMessage(dto.clientId, dto.telegramId, message);
     return { success: true };
