@@ -28,7 +28,7 @@ export class NotificationsService {
         private readonly gateway: NotificationGateway,
         @InjectQueue('notification-queue')
         private readonly notificationQueue: Queue,
-    ) {}
+    ) { }
 
     async getNotifications(userId: string, page: number = 1, limit: number = 20) {
         const [items, total] = await this.notificationRepo.findAndCount({
@@ -129,7 +129,7 @@ export class NotificationsService {
         const jobs = saved.map(n => {
             const user = userMap.get(n.userId);
             const redirectUrl = user?.role === 'DIRECTOR' ? '/director/notifications' : '/employee/notifications';
-            
+
             return {
                 name: 'send-delivery',
                 data: {
@@ -146,7 +146,7 @@ export class NotificationsService {
                 }
             };
         });
-        
+
         // Emit sockets instantly
         saved.forEach(n => this.gateway.server.to(n.userId).emit('notification', n));
 

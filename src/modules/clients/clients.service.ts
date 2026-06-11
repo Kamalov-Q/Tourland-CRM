@@ -14,7 +14,7 @@ import { ClientsGateway } from './gateways/clients.gateway';
 import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationType } from '../notifications/enums/notification-type.enum';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { LessThanOrEqual, IsNull } from 'typeorm';
+import { LessThanOrEqual, IsNull, In } from 'typeorm';
 import { User, UserRole } from '../users/entities/user.entity';
 import { TelegramService } from '../telegram/telegram.service';
 import * as XLSX from 'xlsx';
@@ -140,8 +140,8 @@ export class ClientsService {
             client.lastCallReminderNotifiedAt = null;
         }
 
-        // Track who set the reminder or who is responsible for no-answer follow-up
-        if (dto.remindAt || dto.stage === ClientStage.NO_ANSWER) {
+        // Track who set the reminder or who is responsible for no-answer/talked follow-up
+        if (dto.remindAt || dto.stage === ClientStage.NO_ANSWER || dto.stage === ClientStage.TALKED) {
             client.remindEmployeeId = user.id;
         }
 
@@ -537,23 +537,25 @@ export class ClientsService {
 
         // 3. Persistent "Ko'tarmadi" (No Answer) Reminders
         const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
-        const noAnswerReminders = await this.clientRepo.find({
+        const persistentReminders = await this.clientRepo.find({
             where: [
                 {
-                    stage: ClientStage.NO_ANSWER,
+                    stage: In([ClientStage.NO_ANSWER, ClientStage.TALKED]),
                     lastCallReminderNotifiedAt: IsNull(),
                     updatedAt: LessThanOrEqual(oneHourAgo)
                 },
                 {
-                    stage: ClientStage.NO_ANSWER,
+                    stage: In([ClientStage.NO_ANSWER, ClientStage.TALKED]),
                     lastCallReminderNotifiedAt: LessThanOrEqual(oneHourAgo)
                 }
             ]
         });
 
-        if (noAnswerReminders.length > 0) {
-            for (const client of noAnswerReminders) {
-                const message = `⏳ "${client.fullName}" ko'tarmadi. Iltimos, yana bir bor bog'lanishga harakat qiling.`;
+        if (persistentReminders.length > 0) {
+            for (const client of persistentReminders) {
+                const message = client.stage === ClientStage.NO_ANSWER
+                    ? `⏳ "${client.fullName}" ko'tarmadi. Iltimos, yana bir bor bog'lanishga harakat qiling.`
+                    : `⏳ "${client.fullName}" bilan gaplashilgan. Keyingi qadamlarni amalga oshiring.`;
 
                 const userIdsToNotify = await this.getAllUserIds();
                 if (userIdsToNotify.length > 0) {
