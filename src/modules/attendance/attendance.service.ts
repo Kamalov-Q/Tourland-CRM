@@ -192,7 +192,7 @@ export class AttendanceService {
         // Build the 20:00 timestamp for today in Tashkent time
         const tzDateStr = this.getTodayStr(); // YYYY-MM-DD in Tashkent
         const checkoutTime = new Date(tzDateStr);
-        checkoutTime.setHours(20, 0, 0, 0);
+        checkoutTime.setHours(19, 0, 0, 0); // Display 7 PM for UI as requested
 
         const defaultPhoto = '/uploads/attendance/default.jpg';
 
